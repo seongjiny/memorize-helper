@@ -51,28 +51,6 @@
         </div>
       </section>
     </div>
-
-    <div class="h-4" />
-  </section>
-
-  <!-- Not found -->
-  <section v-else class="mx-auto max-w-[520px] px-[14px]">
-    <header
-      class="sticky top-0 z-10 grid h-[54px] grid-cols-[44px_1fr_44px] items-center border-b border-black/10 bg-white"
-    >
-      <button
-        class="h-[38px] w-[38px] rounded-md border border-black/10 bg-white text-[18px] leading-none"
-        @click="goBack"
-        aria-label="Back"
-      >
-        ←
-      </button>
-
-      <div class="text-center text-[15px] font-extrabold">Not found</div>
-      <div />
-    </header>
-
-    <div class="py-4 text-black/65">해당 스크립트를 찾을 수 없습니다.</div>
   </section>
 </template>
 <script setup lang="ts">
