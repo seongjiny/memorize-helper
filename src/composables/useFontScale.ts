@@ -16,21 +16,19 @@ const readFontPx = (): FontPx => {
 }
 
 const clampIndex = (i: number) => Math.max(0, Math.min(FONT_STEPS.length - 1, i))
-
+const stepAt = (idx: number): FontPx => FONT_STEPS[clampIndex(idx)]!
 const fontPx = ref<FontPx>(readFontPx())
 
 watch(fontPx, (v) => localStorage.setItem(FONT_KEY, String(v)), { immediate: true })
 
 const incFont = () => {
   const idx = FONT_STEPS.indexOf(fontPx.value)
-  const next = FONT_STEPS[clampIndex(idx + 1)]
-  fontPx.value = next
+  fontPx.value = stepAt(idx + 1)
 }
 
 const decFont = () => {
   const idx = FONT_STEPS.indexOf(fontPx.value)
-  const prev = FONT_STEPS[clampIndex(idx - 1)]
-  fontPx.value = prev
+  fontPx.value = stepAt(idx - 1)
 }
 
 export function useFontScale() {

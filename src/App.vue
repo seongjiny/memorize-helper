@@ -1,6 +1,6 @@
 <!-- src/App.vue -->
 <template>
-  <main class="app" :style="{ '--scale': scale() }">
+  <main class="app" :style="{ '--scale': scale }">
     <!-- 공통 Topbar -->
     <header class="topbar">
       <!-- Left: Back -->
