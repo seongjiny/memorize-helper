@@ -54,9 +54,10 @@
   </section>
 </template>
 <script setup lang="ts">
-import { computed, reactive } from 'vue'
+import { computed, reactive, watchEffect, ref } from 'vue'
 import { useRoute } from 'vue-router'
-import { getScriptById } from '@/data/database'
+import { getIndexById } from '@/data/database'
+import type { MemorizationScript } from '@/types/script'
 import { useFontScale } from '@/composables/useFontScale'
 
 /* =========================
@@ -70,7 +71,17 @@ const { fontPx } = useFontScale()
 const route = useRoute()
 
 const scriptId = computed(() => String(route.params.id || ''))
-const script = computed(() => getScriptById(scriptId.value))
+const script = ref<MemorizationScript | null>(null)
+
+watchEffect(async () => {
+  const idx = getIndexById(scriptId.value)
+  if (!idx) {
+    script.value = null
+    return
+  }
+  const res = await fetch(idx.source)
+  script.value = await res.json()
+})
 
 /* =========================
    Reveal state

@@ -1,3 +1,10 @@
+export interface ScriptIndex {
+  id: string
+  title: string
+  description?: string
+  meta?: string[]
+  source: string // json 경로
+}
 export interface MemorizationScript {
   id: string
   title: string
