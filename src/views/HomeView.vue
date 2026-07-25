@@ -1,6 +1,8 @@
 <!-- src\views\HomeView.vue -->
 <template>
   <section class="mx-auto max-w-[520px] px-[14px] py-3" :style="{ '--scale': String(fontPx / 15) }">
+    <KakaoLoginPanel compact />
+
     <ul class="mt-3 grid gap-3">
       <li
         v-for="s in scripts"
@@ -28,6 +30,7 @@
   </section>
 </template>
 <script setup lang="ts">
+import KakaoLoginPanel from '@/components/KakaoLoginPanel.vue'
 import { listScripts } from '@/data/database'
 import { useFontScale } from '@/composables/useFontScale'
 const { fontPx } = useFontScale()
