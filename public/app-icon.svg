@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="열린 성경책과 포도나무 잎">
+  <rect width="512" height="512" rx="104" fill="#FFF8E9"/>
+
+  <!-- Muted green book cover -->
+  <path
+    d="M76 235c0-12 10-22 22-22h142c16 0 31 7 41 19 10-12 25-19 41-19h92c12 0 22 10 22 22v146c0 18-15 33-33 33h-86c-14 0-27 5-37 14-10-9-23-14-37-14H109c-18 0-33-15-33-33V235Z"
+    fill="#8FA181"
+  />
+  <path
+    d="M76 369c45-12 104-8 151 9 24 9 42 20 54 34 12-14 30-25 54-34 32-12 68-18 101-15v18c0 18-15 33-33 33h-86c-14 0-27 5-37 14-10-9-23-14-37-14H109c-18 0-33-15-33-33v-12Z"
+    fill="#788B6D"
+  />
+
+  <!-- Warm bookmark -->
+  <path d="M263 349h36v96l-18-14-18 14Z" fill="#F1A06F"/>
+
+  <!-- Left and right pages -->
+  <path
+    d="M104 186c0-8 6-15 14-17 61-13 116-1 151 37l12 13v188l-12-10c-39-32-88-44-145-33-10 2-20-6-20-17V186Z"
+    fill="#FFFDF6"
+    stroke="#42453F"
+    stroke-linejoin="round"
+    stroke-width="8"
+  />
+  <path
+    d="M458 186c0-8-6-15-14-17-61-13-116-1-151 37l-12 13v188l12-10c39-32 88-44 145-33 10 2 20-6 20-17V186Z"
+    fill="#FFFDF6"
+    stroke="#42453F"
+    stroke-linejoin="round"
+    stroke-width="8"
+  />
+  <path d="M281 220v187" fill="none" stroke="#42453F" stroke-linecap="round" stroke-width="8"/>
+
+  <!-- A few quiet page lines -->
+  <g fill="none" stroke="#A5A89F" stroke-linecap="round" stroke-width="7">
+    <path d="M145 250c30-3 57 1 80 12"/>
+    <path d="M145 291c30-3 57 1 80 12"/>
+    <path d="M337 262c23-11 50-15 80-12"/>
+    <path d="M337 303c23-11 50-15 80-12"/>
+  </g>
+
+  <!-- Small grapevine leaf and tendril -->
+  <path
+    d="M340 155c-23-4-39-17-44-38 18-8 36-6 50 5 0-18 9-34 25-44 16 12 23 28 19 46 15-8 32-8 48 0-1 22-14 38-36 47-24 9-48 2-62-16Z"
+    fill="#91A383"
+  />
+  <g fill="none" stroke="#52614D" stroke-linecap="round" stroke-linejoin="round" stroke-width="7">
+    <path d="M337 166c25-26 53-48 83-64"/>
+    <path d="M375 130c0-18-7-33-20-45"/>
+    <path d="M395 116c16-2 30 2 42 12"/>
+    <path d="M419 102c25-14 47 1 40 19-5 12-22 12-24 0-2-11 14-17 26-8"/>
+  </g>
+</svg>
