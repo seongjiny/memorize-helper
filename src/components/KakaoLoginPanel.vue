@@ -1,13 +1,14 @@
 <template>
-  <section class="kakaoPanel" :class="{ compact }">
+  <section class="kakaoPanel" :class="{ compact, menu }">
     <div>
-      <div class="panelTitle">카카오톡 로그인</div>
-      <div class="panelDesc">묵상과 암송일지를 저장할 준비 공간입니다.</div>
+      <div class="panelTitle">{{ userName || '카카오 로그인' }}</div>
+      <div v-if="!menu" class="panelDesc">묵상과 암송일지를 저장할 준비 공간입니다.</div>
+      <div v-else class="panelDesc">
+        {{ userName ? '카카오 계정으로 연결되어 있습니다.' : '암송 기록을 계정에 연결하세요.' }}
+      </div>
     </div>
 
-    <button class="kakaoBtn" type="button" @click="login">
-      {{ userName ? '카카오 계정 연결됨' : '카카오톡으로 시작하기' }}
-    </button>
+    <button v-if="!userName" class="kakaoBtn" type="button" @click="login">카카오로 로그인</button>
 
     <button v-if="userName" class="logoutBtn" type="button" @click="logout">로그아웃</button>
 
@@ -18,23 +19,20 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, ref } from 'vue'
 import { supabase } from '@/lib/supabase'
+import { useAuthSession } from '@/composables/useAuthSession'
 
 defineProps<{
   compact?: boolean
+  menu?: boolean
 }>()
 
 const message = ref('')
-const userName = ref('')
-
-const readSession = async () => {
-  if (!supabase) return
-  const { data } = await supabase.auth.getSession()
-  const user = data.session?.user
-  userName.value =
-    user?.user_metadata?.name || user?.user_metadata?.nickname || user?.email || ''
-}
+const { user, initialize } = useAuthSession()
+const userName = computed(
+  () => user.value?.user_metadata?.name || user.value?.user_metadata?.nickname || user.value?.email,
+)
 
 const login = async () => {
   message.value = ''
@@ -45,6 +43,11 @@ const login = async () => {
   }
 
   if (userName.value) return
+
+  sessionStorage.setItem(
+    'mh_auth_return_to',
+    `${window.location.pathname}${window.location.search}`,
+  )
 
   const { error } = await supabase.auth.signInWithOAuth({
     provider: 'kakao',
@@ -61,16 +64,10 @@ const login = async () => {
 const logout = async () => {
   if (!supabase) return
   await supabase.auth.signOut()
-  userName.value = ''
   message.value = '로그아웃되었습니다.'
 }
 
-onMounted(() => {
-  readSession()
-  supabase?.auth.onAuthStateChange(() => {
-    readSession()
-  })
-})
+initialize()
 </script>
 
 <style scoped>
@@ -85,6 +82,14 @@ onMounted(() => {
 
 .kakaoPanel.compact {
   margin-top: 12px;
+}
+
+.kakaoPanel.menu {
+  gap: 10px;
+  border: 0;
+  border-radius: 0;
+  background: white;
+  padding: 14px;
 }
 
 .panelTitle {
@@ -105,7 +110,7 @@ onMounted(() => {
   min-height: 42px;
   border: 0;
   border-radius: 8px;
-  background: #fee500;
+  background: #f8df00;
   color: #191600;
   font-weight: 800;
   cursor: pointer;

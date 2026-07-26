@@ -12,10 +12,11 @@
 
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { supabase } from '@/lib/supabase'
 
 const route = useRoute()
+const router = useRouter()
 const title = ref('카카오 로그인 확인 중')
 const message = ref('Supabase 세션을 확인하고 있습니다.')
 
@@ -34,10 +35,20 @@ onMounted(async () => {
   }
 
   const { data } = await supabase.auth.getSession()
-  title.value = data.session ? '카카오 로그인 연결됨' : '카카오 로그인 대기 중'
-  message.value = data.session
-    ? '이제 묵상과 암송일지를 Supabase 계정에 연결할 수 있습니다.'
-    : '세션이 아직 확인되지 않았습니다. Supabase Redirect URL 설정을 확인해 주세요.'
+  if (data.session) {
+    const returnTo = sessionStorage.getItem('mh_auth_return_to')
+    sessionStorage.removeItem('mh_auth_return_to')
+    const isSafeReturnPath =
+      returnTo?.startsWith('/') &&
+      !returnTo.startsWith('//') &&
+      !returnTo.startsWith('/oauth/kakao/callback')
+    const destination = isSafeReturnPath && returnTo ? returnTo : '/'
+    await router.replace(destination)
+    return
+  }
+
+  title.value = '카카오 로그인 대기 중'
+  message.value = '세션이 아직 확인되지 않았습니다. Supabase Redirect URL 설정을 확인해 주세요.'
 })
 </script>
 

@@ -7,13 +7,7 @@
       '--font-px': `${fontPx}px`,
       '--scale': String(fontPx / 15),
     }"
-    @touchstart.passive="onTouchStart"
-    @touchend.passive="onTouchEnd"
   >
-    <button class="journalTab" type="button" aria-label="묵상 페이지 열기" @click="openJournal">
-      로그인
-    </button>
-
     <!-- Topbar -->
     <div class="scriptTitle">
       {{ script.title }}
@@ -58,56 +52,184 @@
       </section>
     </div>
 
-    <Transition name="panelBackdrop">
-      <div v-if="isJournalOpen" class="journalBackdrop" @click="closeJournal" />
-    </Transition>
+    <Transition name="recordModal">
+      <div v-if="isRecordOpen" class="recordBackdrop" @click.self="closeRecord">
+        <section class="recordModal" role="dialog" aria-modal="true" aria-label="암송 기록 입력">
+          <template v-if="!user">
+            <div class="recordHeader">
+              <div>
+                <div class="recordTitle">로그인이 필요해요</div>
+                <p class="recordDesc">암송 기록은 로그인한 사용자만 저장할 수 있습니다.</p>
+              </div>
+              <button class="closeBtn" type="button" aria-label="기록 창 닫기" @click="closeRecord">
+                ×
+              </button>
+            </div>
 
-    <Transition name="journal">
-      <aside v-if="isJournalOpen" class="journalPanel" aria-label="묵상과 암송일지">
-        <button class="closeBtn" type="button" aria-label="묵상 페이지 닫기" @click="closeJournal">
-          닫기
-        </button>
+            <KakaoLoginPanel />
+          </template>
 
-        <div class="journalTitle">묵상과 암송일지</div>
-        <p class="journalDesc">카카오톡 로그인 후 암송 기록을 이어서 붙일 공간입니다.</p>
+          <template v-else-if="existingRecord">
+            <div class="recordHeader">
+              <div>
+                <div class="recordTitle">이 날짜의 기록을 변경할까요?</div>
+                <p class="recordDesc">같은 날짜에는 하나의 암송 기록만 저장됩니다.</p>
+              </div>
+            </div>
 
-        <KakaoLoginPanel />
+            <div class="changeSummary">
+              <div>
+                <span>기존</span>
+                {{ formatRange(existingRecord) }}
+              </div>
+              <div>
+                <span>변경</span>
+                {{ formRange }}
+              </div>
+            </div>
 
-        <div class="futureBox">
-          <div class="futureTitle">다음에 넣을 수 있는 것</div>
-          <ul class="futureList">
-            <li>오늘 암송한 구절</li>
-            <li>묵상 메모</li>
-            <li>암송 체크 기록</li>
-          </ul>
-        </div>
-      </aside>
+            <p v-if="recordError" class="recordError">{{ recordError }}</p>
+
+            <div class="recordActions">
+              <button
+                class="secondaryBtn"
+                type="button"
+                :disabled="isSaving"
+                @click="existingRecord = null"
+              >
+                돌아가기
+              </button>
+              <button class="primaryBtn" type="button" :disabled="isSaving" @click="persistRecord">
+                {{ isSaving ? '저장 중…' : '변경하기' }}
+              </button>
+            </div>
+          </template>
+
+          <form v-else @submit.prevent="submitRecord">
+            <div class="recordHeader">
+              <div>
+                <div class="recordTitle">암송 기록</div>
+                <p class="recordDesc">
+                  열어본 절을 기준으로 범위를 입력했어요. 필요한 경우 수정해 주세요.
+                </p>
+              </div>
+              <button class="closeBtn" type="button" aria-label="기록 창 닫기" @click="closeRecord">
+                ×
+              </button>
+            </div>
+
+            <label class="field">
+              <span>날짜</span>
+              <input v-model="recordForm.recordDate" type="date" :max="todayKey" />
+            </label>
+
+            <label class="field">
+              <span>본문</span>
+              <input v-model.trim="recordForm.book" type="text" autocomplete="off" />
+            </label>
+
+            <div class="rangeRow">
+              <div class="rangeLabel">시작</div>
+              <label class="numberField">
+                <input
+                  v-model.number="recordForm.startChapter"
+                  type="number"
+                  min="1"
+                  inputmode="numeric"
+                />
+                <span>장</span>
+              </label>
+              <label class="numberField">
+                <input
+                  v-model.number="recordForm.startVerse"
+                  type="number"
+                  min="1"
+                  inputmode="numeric"
+                />
+                <span>절</span>
+              </label>
+            </div>
+
+            <div class="rangeRow">
+              <div class="rangeLabel">마지막</div>
+              <label class="numberField">
+                <input
+                  v-model.number="recordForm.endChapter"
+                  type="number"
+                  min="1"
+                  inputmode="numeric"
+                />
+                <span>장</span>
+              </label>
+              <label class="numberField">
+                <input
+                  v-model.number="recordForm.endVerse"
+                  type="number"
+                  min="1"
+                  inputmode="numeric"
+                />
+                <span>절</span>
+              </label>
+            </div>
+
+            <p v-if="recordError" class="recordError">{{ recordError }}</p>
+
+            <div class="recordActions">
+              <button class="secondaryBtn" type="button" :disabled="isSaving" @click="closeRecord">
+                취소
+              </button>
+              <button class="primaryBtn" type="submit" :disabled="isSaving">
+                {{ isSaving ? '확인 중…' : '기록 저장' }}
+              </button>
+            </div>
+          </form>
+        </section>
+      </div>
     </Transition>
   </section>
 </template>
 <script setup lang="ts">
-import { computed, reactive, watchEffect, ref } from 'vue'
-import { useRoute } from 'vue-router'
+import { computed, onMounted, onUnmounted, reactive, watchEffect, ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { getIndexById } from '@/data/database'
 import type { MemorizationScript } from '@/types/script'
+import type { MemorizationRecord, VerseReference } from '@/types/memorizationRecord'
 import { useFontScale } from '@/composables/useFontScale'
+import { useScriptRevealControls } from '@/composables/useScriptRevealControls'
+import { useAuthSession } from '@/composables/useAuthSession'
+import { useMemorizationRecords } from '@/composables/useMemorizationRecords'
+import { compareVerseReferences, getVerseReference } from '@/lib/verseReference'
+import { toDateKey } from '@/lib/date'
 import KakaoLoginPanel from '@/components/KakaoLoginPanel.vue'
 
 /* =========================
    Font size
 ========================= */
 const { fontPx } = useFontScale()
+const { user, initialize: initializeAuth } = useAuthSession()
+const { findByDate, save } = useMemorizationRecords()
 
 /* =========================
    Routing / data
 ========================= */
 const route = useRoute()
+const router = useRouter()
+const todayKey = toDateKey(new Date())
 
 const scriptId = computed(() => String(route.params.id || ''))
 const script = ref<MemorizationScript | null>(null)
-const isJournalOpen = ref(false)
-const touchStartX = ref(0)
-const touchStartY = ref(0)
+const isRecordOpen = ref(false)
+const isSaving = ref(false)
+const existingRecord = ref<MemorizationRecord | null>(null)
+const recordError = ref('')
+const recordForm = reactive({
+  recordDate: todayKey,
+  book: '',
+  startChapter: null as number | null,
+  startVerse: null as number | null,
+  endChapter: null as number | null,
+  endVerse: null as number | null,
+})
 
 watchEffect(async () => {
   const idx = getIndexById(scriptId.value)
@@ -123,13 +245,52 @@ watchEffect(async () => {
    Reveal state
 ========================= */
 const revealed = reactive<Record<string, boolean>>({})
+const openedVerses = reactive<Record<string, VerseReference>>({})
 
 const keyOf = (bi: number, li: number) => `${bi}-${li}`
 const isOpen = (bi: number, li: number) => revealed[keyOf(bi, li)] === true
 const toggle = (bi: number, li: number) => {
   const k = keyOf(bi, li)
   revealed[k] = !revealed[k]
+
+  if (revealed[k]) {
+    trackOpenedVerse(bi, li)
+  }
 }
+
+const setAllRevealed = (isRevealed: boolean) => {
+  script.value?.blocks.forEach((block, bi) => {
+    block.lines.forEach((_, li) => {
+      revealed[keyOf(bi, li)] = isRevealed
+      if (isRevealed) trackOpenedVerse(bi, li)
+    })
+  })
+}
+
+const trackOpenedVerse = (bi: number, li: number) => {
+  const currentScript = script.value
+  const block = currentScript?.blocks[bi]
+  const line = block?.lines[li]
+  if (!currentScript || !line) return
+
+  const reference = getVerseReference(currentScript, block.label, line)
+  if (reference) {
+    openedVerses[keyOf(bi, li)] = reference
+  }
+}
+
+const { register, unregister } = useScriptRevealControls()
+
+onMounted(() => {
+  register({
+    hideAll: () => setAllRevealed(false),
+    revealAll: () => setAllRevealed(true),
+    getRecordLabel: () => openedRangeLabel.value,
+    openRecord,
+  })
+})
+
+onUnmounted(unregister)
 
 /* =========================
    Word splitting (cache)
@@ -146,30 +307,167 @@ const getWords = (bi: number, li: number, line: string) => {
   return wordsCache[k]
 }
 
-const openJournal = () => {
-  isJournalOpen.value = true
-}
+const openedRange = computed(() => Object.values(openedVerses).sort(compareVerseReferences))
 
-const closeJournal = () => {
-  isJournalOpen.value = false
-}
+const openedRangeLabel = computed(() => {
+  const first = openedRange.value[0]
+  const last = openedRange.value[openedRange.value.length - 1]
+  if (!first || !last) return '아직 열어본 절이 없어요'
 
-const onTouchStart = (event: TouchEvent) => {
-  const touch = event.changedTouches[0]
-  if (!touch) return
-  touchStartX.value = touch.clientX
-  touchStartY.value = touch.clientY
-}
-
-const onTouchEnd = (event: TouchEvent) => {
-  const touch = event.changedTouches[0]
-  if (!touch) return
-
-  const dx = touch.clientX - touchStartX.value
-  const dy = touch.clientY - touchStartY.value
-  if (dx > 70 && Math.abs(dy) < 60) {
-    openJournal()
+  if (first.chapter === last.chapter) {
+    return `${first.book} ${first.chapter}장 ${first.verse}–${last.verse}절`
   }
+
+  return `${first.book} ${first.chapter}장 ${first.verse}절–${last.chapter}장 ${last.verse}절`
+})
+
+const formRange = computed(() => {
+  if (
+    !recordForm.book ||
+    !recordForm.startChapter ||
+    !recordForm.startVerse ||
+    !recordForm.endChapter ||
+    !recordForm.endVerse
+  ) {
+    return '범위를 입력해 주세요'
+  }
+
+  return formatRange({
+    book: recordForm.book,
+    startChapter: recordForm.startChapter!,
+    startVerse: recordForm.startVerse!,
+    endChapter: recordForm.endChapter!,
+    endVerse: recordForm.endVerse!,
+  })
+})
+
+const openRecord = async () => {
+  await initializeAuth()
+  existingRecord.value = null
+  recordError.value = ''
+
+  const first = openedRange.value[0]
+  const last = openedRange.value[openedRange.value.length - 1]
+  const currentScript = script.value
+
+  recordForm.book =
+    first?.book ||
+    currentScript?.meta?.[0]?.match(/^([가-힣A-Za-z]+)/)?.[1] ||
+    currentScript?.title ||
+    ''
+  recordForm.recordDate = todayKey
+  recordForm.startChapter = first?.chapter ?? null
+  recordForm.startVerse = first?.verse ?? null
+  recordForm.endChapter = last?.chapter ?? null
+  recordForm.endVerse = last?.verse ?? null
+  isRecordOpen.value = true
+}
+
+const closeRecord = () => {
+  isRecordOpen.value = false
+  existingRecord.value = null
+}
+
+const isPositiveInteger = (value: number | null) =>
+  typeof value === 'number' && Number.isInteger(value) && value > 0
+
+const submitRecord = async () => {
+  recordError.value = ''
+
+  if (
+    !recordForm.recordDate ||
+    !recordForm.book ||
+    !isPositiveInteger(recordForm.startChapter) ||
+    !isPositiveInteger(recordForm.startVerse) ||
+    !isPositiveInteger(recordForm.endChapter) ||
+    !isPositiveInteger(recordForm.endVerse)
+  ) {
+    recordError.value = '날짜, 본문과 시작·마지막 장절을 모두 입력해 주세요.'
+    return
+  }
+
+  const startsAfterEnd =
+    recordForm.startChapter! > recordForm.endChapter! ||
+    (recordForm.startChapter === recordForm.endChapter &&
+      recordForm.startVerse! > recordForm.endVerse!)
+
+  if (startsAfterEnd) {
+    recordError.value = '마지막 장절은 시작 장절보다 뒤에 있어야 합니다.'
+    return
+  }
+
+  if (!user.value) return
+
+  isSaving.value = true
+
+  try {
+    const savedRecord = await findByDate(user.value.id, recordForm.recordDate)
+    if (savedRecord) {
+      existingRecord.value = savedRecord
+      return
+    }
+
+    await saveRecord()
+  } catch (error) {
+    recordError.value =
+      error instanceof Error ? error.message : '기존 암송 기록을 확인하지 못했습니다.'
+  } finally {
+    isSaving.value = false
+  }
+}
+
+const persistRecord = async () => {
+  recordError.value = ''
+  isSaving.value = true
+
+  try {
+    await saveRecord()
+  } catch (error) {
+    recordError.value = error instanceof Error ? error.message : '암송 기록을 저장하지 못했습니다.'
+  } finally {
+    isSaving.value = false
+  }
+}
+
+const saveRecord = async () => {
+  if (
+    !user.value ||
+    !script.value ||
+    !recordForm.startChapter ||
+    !recordForm.startVerse ||
+    !recordForm.endChapter ||
+    !recordForm.endVerse
+  ) {
+    return
+  }
+
+  await save({
+    userId: user.value.id,
+    recordDate: recordForm.recordDate,
+    scriptId: script.value.id,
+    book: recordForm.book,
+    startChapter: recordForm.startChapter,
+    startVerse: recordForm.startVerse,
+    endChapter: recordForm.endChapter,
+    endVerse: recordForm.endVerse,
+    updatedAt: new Date().toISOString(),
+  })
+
+  closeRecord()
+  router.push('/records')
+}
+
+const formatRange = (
+  record: Pick<
+    MemorizationRecord,
+    'book' | 'startChapter' | 'startVerse' | 'endChapter' | 'endVerse'
+  >,
+) => {
+  if (record.startChapter === record.endChapter) {
+    return `${record.book} ${record.startChapter}장 ${record.startVerse}–${record.endVerse}절`
+  }
+
+  return `${record.book} ${record.startChapter}장 ${record.startVerse}절–${record.endChapter}장 ${record.endVerse}절`
 }
 </script>
 
@@ -225,101 +523,181 @@ const onTouchEnd = (event: TouchEvent) => {
   background: rgba(0, 0, 0, 0.18);
 }
 
-.journalTab {
-  position: fixed;
-  right: 12px;
-  bottom: 18px;
-  z-index: 15;
-  min-width: 64px;
-  min-height: 38px;
-  border: 1px solid rgba(0, 0, 0, 0.1);
-  border-radius: 999px;
-  background: #111827;
-  color: white;
-  font-weight: 800;
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.18);
-}
-
-.journalBackdrop {
+.recordBackdrop {
   position: fixed;
   inset: 0;
-  z-index: 30;
-  background: rgba(0, 0, 0, 0.26);
+  z-index: 50;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: rgba(17, 24, 39, 0.34);
+  padding: 14px;
 }
 
-.journalPanel {
-  position: fixed;
-  top: 0;
-  right: 0;
-  z-index: 31;
-  width: min(88vw, 390px);
-  height: 100dvh;
+.recordModal {
+  width: min(100%, 440px);
+  max-height: calc(100dvh - 28px);
   overflow-y: auto;
-  background: #ffffff;
-  padding: 18px 16px 24px;
-  box-shadow: -16px 0 36px rgba(0, 0, 0, 0.18);
-}
-
-.closeBtn {
-  margin-left: auto;
-  display: block;
-  min-width: 52px;
-  min-height: 34px;
-  border: 1px solid rgba(0, 0, 0, 0.12);
-  border-radius: 8px;
+  border-radius: 18px;
   background: white;
-  font-weight: 800;
+  padding: 18px;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.2);
 }
 
-.journalTitle {
-  margin-top: 18px;
+.recordHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.recordTitle {
   font-size: calc(20px * var(--scale, 1));
   font-weight: 900;
 }
 
-.journalDesc {
-  margin: 6px 0 14px;
+.recordDesc {
+  margin-top: 5px;
+  color: rgba(0, 0, 0, 0.6);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.closeBtn {
+  flex: 0 0 auto;
+  width: 34px;
+  height: 34px;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 50%;
+  background: white;
   color: rgba(0, 0, 0, 0.62);
-  font-size: calc(13px * var(--scale, 1));
-  line-height: 1.4;
+  font-size: 22px;
+  line-height: 1;
 }
 
-.futureBox {
-  margin-top: 14px;
-  border: 1px solid rgba(0, 0, 0, 0.08);
+.field {
+  display: grid;
+  gap: 7px;
+  margin-bottom: 16px;
+}
+
+.field > span,
+.rangeLabel {
+  color: rgba(0, 0, 0, 0.62);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.field input {
+  width: 100%;
+  height: 44px;
+  border: 1px solid rgba(0, 0, 0, 0.12);
   border-radius: 10px;
-  padding: 14px;
+  padding: 0 12px;
+  outline: none;
 }
 
-.futureTitle {
+.field input:focus,
+.numberField:focus-within {
+  border-color: #111827;
+}
+
+.rangeRow {
+  margin-bottom: 10px;
+  display: grid;
+  grid-template-columns: 52px 1fr 1fr;
+  align-items: center;
+  gap: 8px;
+}
+
+.numberField {
+  height: 44px;
+  display: flex;
+  align-items: center;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 10px;
+  padding: 0 10px;
+}
+
+.numberField input {
+  min-width: 0;
+  width: 100%;
+  border: 0;
+  outline: 0;
+  font-weight: 800;
+}
+
+.numberField span {
+  flex: 0 0 auto;
+  color: rgba(0, 0, 0, 0.56);
+  font-size: 13px;
+}
+
+.recordError {
+  margin-top: 10px;
+  color: #b42318;
+  font-size: 13px;
+}
+
+.recordActions {
+  margin-top: 20px;
+  display: grid;
+  grid-template-columns: 1fr 1.6fr;
+  gap: 8px;
+}
+
+.primaryBtn,
+.secondaryBtn {
+  min-height: 46px;
+  border-radius: 10px;
   font-weight: 900;
 }
 
-.futureList {
-  margin-top: 8px;
+.primaryBtn:disabled,
+.secondaryBtn:disabled {
+  cursor: wait;
+  opacity: 0.58;
+}
+
+.primaryBtn {
+  border: 0;
+  background: #111827;
+  color: white;
+}
+
+.secondaryBtn {
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  background: white;
+  color: #374151;
+}
+
+.changeSummary {
   display: grid;
-  gap: 6px;
-  padding-left: 18px;
-  color: rgba(0, 0, 0, 0.7);
-  font-size: calc(13px * var(--scale, 1));
+  gap: 10px;
 }
 
-.journal-enter-active,
-.journal-leave-active,
-.panelBackdrop-enter-active,
-.panelBackdrop-leave-active {
-  transition:
-    transform 0.2s ease,
-    opacity 0.2s ease;
+.changeSummary div {
+  display: grid;
+  gap: 4px;
+  border-radius: 10px;
+  background: #f5f6f7;
+  padding: 12px;
+  font-weight: 800;
 }
 
-.journal-enter-from,
-.journal-leave-to {
-  transform: translateX(100%);
+.changeSummary span {
+  color: rgba(0, 0, 0, 0.5);
+  font-size: 12px;
 }
 
-.panelBackdrop-enter-from,
-.panelBackdrop-leave-to {
+.recordModal-enter-active,
+.recordModal-leave-active {
+  transition: opacity 0.2s ease;
+}
+
+.recordModal-enter-from,
+.recordModal-leave-to {
   opacity: 0;
 }
 </style>
