@@ -5,7 +5,7 @@
       <li
         v-for="s in scripts"
         :key="s.id"
-        class="overflow-hidden rounded-xl border border-black/10 bg-white shadow-sm"
+        class="scriptCard overflow-hidden rounded-xl border border-black/10 bg-white shadow-sm"
       >
         <RouterLink
           :to="`/script/${s.id}`"
