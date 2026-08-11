@@ -209,3 +209,50 @@ body:has(.app.dark) {
 .app.dark .settingRow input:checked {
   background: #34d399 !important;
 }
+
+.app.dark .scriptCard {
+  border-color: #465468 !important;
+  background: #202c3d !important;
+}
+
+.app.dark .scriptCard .cardDesc,
+.app.dark .scriptCard .progressText {
+  color: #b9c4d2 !important;
+}
+
+.app.dark .scriptCard .progressText strong {
+  color: #5ee3ad !important;
+}
+
+.app.dark .scriptCard .progressTrack {
+  background: #4b596c !important;
+}
+
+.app.dark .scriptCard .progressTrack span {
+  background: #34d399 !important;
+}
+
+.app.dark .scriptCard .tag {
+  border-color: #536176 !important;
+  background: #2a384b !important;
+  color: #dce5ef !important;
+}
+
+.app.dark .updateContent .intro,
+.app.dark .updateContent section p {
+  color: #b9c4d2 !important;
+}
+
+.app.dark .updateContent section {
+  border-color: rgba(255, 255, 255, 0.12) !important;
+}
+
+.app.dark .updateContent .icon {
+  background: #334155 !important;
+  color: #e8eef6 !important;
+}
+
+.app.dark .updateContent .releaseBadge {
+  background: #164e3b !important;
+  color: #6ee7b7 !important;
+}
