@@ -1,3 +1,211 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+html,
+body,
+#app {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  background: white;
+  color: #111827;
+}
+
+body:has(.app.dark) {
+  background: #111827;
+}
+
+.app.dark {
+  min-height: 100dvh;
+  color-scheme: dark;
+  background: #111827;
+  color: #f3f4f6;
+}
+
+.app.dark .topbar,
+.app.dark .menuPanel,
+.app.dark .navBtn,
+.app.dark .menuBtn,
+.app.dark .fontBtn,
+.app.dark .weekList,
+.app.dark .calendar,
+.app.dark .editorModal,
+.app.dark .recordModal,
+.app.dark .updateModal {
+  border-color: rgba(255, 255, 255, 0.14) !important;
+  background: #1f2937 !important;
+  color: #f3f4f6 !important;
+}
+
+.app.dark .text-gray-800,
+.app.dark .fontSize,
+.app.dark .settingRow,
+.app.dark .recordsLink,
+.app.dark .stateTitle,
+.app.dark .recordSummary strong,
+.app.dark .editorHeader h2,
+.app.dark .recordTitle {
+  color: #f3f4f6 !important;
+}
+
+.app.dark .menuBtn span,
+.app.dark .recordDot {
+  background: #e5e7eb;
+}
+
+.app.dark .menuActionBtn,
+.app.dark .stateBox,
+.app.dark .viewToggle,
+.app.dark .recordSummary,
+.app.dark .deleteSummary,
+.app.dark .dayRow.today,
+.app.dark .calendarDay.today,
+.app.dark .calendarDay.canCreate:hover,
+.app.dark .calendarDay.canCreate:focus-visible {
+  border-color: rgba(255, 255, 255, 0.12) !important;
+  background: #374151 !important;
+  color: #f3f4f6 !important;
+}
+
+.app.dark input,
+.app.dark select,
+.app.dark button {
+  color: inherit;
+}
+
+.app.dark input,
+.app.dark select {
+  border-color: rgba(255, 255, 255, 0.18) !important;
+  background: #111827 !important;
+}
+
+.app.dark .chip,
+.app.dark .dayRow + .dayRow,
+.app.dark .recordsLink,
+.app.dark .depthLink,
+.app.dark .depthHeader,
+.app.dark .menuSection {
+  border-color: rgba(255, 255, 255, 0.12) !important;
+}
+
+.app.dark .depthLink,
+.app.dark .depthHeader,
+.app.dark .depthHeader button {
+  color: #f3f4f6 !important;
+}
+
+.app.dark .chapterHeading {
+  border-color: #34d399;
+  color: #f9fafb;
+}
+
+/* Theme contrast: keep primary, secondary and muted content distinct in both modes. */
+.app .desc,
+.app .pageHeader p,
+.app .stateBox p,
+.app .panelDesc,
+.app .recordDesc,
+.app .editorHeader p,
+.app .updateIntro,
+.app .updateItem p {
+  color: #4b5563;
+}
+
+.app.dark .desc,
+.app.dark .pageHeader p,
+.app.dark .stateBox p,
+.app.dark .panelDesc,
+.app.dark .recordDesc,
+.app.dark .editorHeader p,
+.app.dark .updateIntro,
+.app.dark .updateItem p,
+.app.dark .menuLabel,
+.app.dark .recordSummary span,
+.app.dark .date span,
+.app.dark .record span,
+.app.dark .calendarWeekday,
+.app.dark .empty,
+.app.dark .field > span,
+.app.dark .rangeLabel,
+.app.dark .editField > span,
+.app.dark .editRange > div {
+  color: #aeb9c8 !important;
+}
+
+.app.dark .scriptTitle,
+.app.dark .blockTitle,
+.app.dark .verseText,
+.app.dark .pageHeader h1,
+.app.dark .historyNav strong,
+.app.dark .date strong,
+.app.dark .record,
+.app.dark .calendarDate,
+.app.dark .panelTitle,
+.app.dark .updateContent h1,
+.app.dark .updateContent h2 {
+  color: #f8fafc !important;
+}
+
+.app.dark .kakaoPanel,
+.app.dark .kakaoPanel.menu,
+.app.dark .bg-white,
+.app.dark .callbackCard {
+  border-color: rgba(255, 255, 255, 0.14) !important;
+  background: #1f2937 !important;
+  color: #f8fafc !important;
+}
+
+.app.dark .panelTitle,
+.app.dark .panelMessage {
+  color: #f8fafc !important;
+}
+
+.app.dark .logoutBtn,
+.app.dark .secondaryBtn,
+.app.dark .editorActions button,
+.app.dark .historyNav > button,
+.app.dark .errorState button {
+  border-color: #566477 !important;
+  background: #273449 !important;
+  color: #f8fafc !important;
+}
+
+.app.dark .recordBtn,
+.app.dark .primaryBtn,
+.app.dark .saveBtn,
+.app.dark .updateCloseBtn,
+.app.dark .viewToggle button.active {
+  border-color: #34d399 !important;
+  background: #34d399 !important;
+  color: #062b1e !important;
+}
+
+.app.dark .viewToggle button {
+  color: #b8c3d1 !important;
+}
+
+.app.dark .word.masked {
+  background: #334155;
+}
+
+.app.dark .chip {
+  background: #263449;
+  color: #dbe4ee;
+}
+
+.app.dark .recordError,
+.app.dark .editError,
+.app.dark .deleteBtn {
+  color: #fda4af !important;
+}
+
+.app.dark .settingRow input {
+  background: #526074 !important;
+}
+
+.app.dark .settingRow input:checked {
+  background: #34d399 !important;
+}

@@ -83,7 +83,16 @@
                 <span v-if="day.isToday">오늘 기록</span>
                 <span v-else>눌러서 수정</span>
               </button>
-              <div v-else class="empty">기록 없음</div>
+              <button
+                v-else
+                class="empty emptyAction"
+                type="button"
+                :disabled="day.isFuture"
+                :aria-label="day.isFuture ? '미래 날짜에는 기록할 수 없음' : '암송 기록 추가'"
+                @click="openCreator(day.key)"
+              >
+                {{ day.isFuture ? '기록 없음' : '눌러서 기록' }}
+              </button>
             </article>
           </div>
         </template>
@@ -110,10 +119,14 @@
               :key="day?.key || `empty-${index}`"
               type="button"
               class="calendarDay"
-              :class="{ today: day?.isToday, hasRecord: day?.record }"
-              :disabled="!day?.record"
-              :title="day?.record ? formatRange(day.record) : undefined"
-              @click="day?.record && openEditor(day.record)"
+              :class="{
+                today: day?.isToday,
+                hasRecord: day?.record,
+                canCreate: day && !day.record && !day.isFuture,
+              }"
+              :disabled="!day || day.isFuture"
+              :title="day?.record ? formatRange(day.record) : day && !day.isFuture ? '암송 기록 추가' : undefined"
+              @click="day && (day.record ? openEditor(day.record) : openCreator(day.key))"
             >
               <template v-if="day">
                 <span class="calendarDate">{{ day.day }}</span>
@@ -126,9 +139,14 @@
     </template>
 
     <Transition name="editor">
-      <div v-if="selectedRecord" class="editorBackdrop" @click.self="closeEditor">
-        <section class="editorModal" role="dialog" aria-modal="true" aria-label="암송 기록 수정">
-          <template v-if="isDeleteConfirm">
+      <div v-if="isEditorOpen" class="editorBackdrop" @click.self="closeEditor">
+        <section
+          class="editorModal"
+          role="dialog"
+          aria-modal="true"
+          :aria-label="selectedRecord ? '암송 기록 수정' : '암송 기록 추가'"
+        >
+          <template v-if="selectedRecord && isDeleteConfirm">
             <div class="editorHeader">
               <div>
                 <h2>이 기록을 삭제할까요?</h2>
@@ -155,8 +173,8 @@
           <form v-else @submit.prevent="saveChanges">
             <div class="editorHeader">
               <div>
-                <h2>암송 기록 수정</h2>
-                <p>날짜와 암송 범위를 변경할 수 있어요.</p>
+                <h2>{{ selectedRecord ? '암송 기록 수정' : '암송 기록 추가' }}</h2>
+                <p>날짜와 암송 범위를 입력해 주세요.</p>
               </div>
               <button type="button" aria-label="수정 창 닫기" @click="closeEditor">×</button>
             </div>
@@ -164,6 +182,15 @@
             <label class="editField">
               <span>날짜</span>
               <input v-model="editForm.recordDate" type="date" :max="todayKey" />
+            </label>
+
+            <label class="editField">
+              <span>암송 본문</span>
+              <select v-model="editForm.scriptId" @change="applySelectedScriptDefaults">
+                <option v-for="item in scripts" :key="item.id" :value="item.id">
+                  {{ item.title }}
+                </option>
+              </select>
             </label>
 
             <label class="editField">
@@ -199,6 +226,7 @@
 
             <div class="editorFooter">
               <button
+                v-if="selectedRecord"
                 class="deleteBtn"
                 type="button"
                 :disabled="isMutating"
@@ -209,7 +237,7 @@
               <div class="editorActions">
                 <button type="button" :disabled="isMutating" @click="closeEditor">취소</button>
                 <button class="saveBtn" type="submit" :disabled="isMutating">
-                  {{ isMutating ? '저장 중…' : '수정 저장' }}
+                  {{ isMutating ? '저장 중…' : selectedRecord ? '수정 저장' : '기록 저장' }}
                 </button>
               </div>
             </div>
@@ -226,6 +254,7 @@ import type { MemorizationRecord } from '@/types/memorizationRecord'
 import { useAuthSession } from '@/composables/useAuthSession'
 import { useMemorizationRecords } from '@/composables/useMemorizationRecords'
 import { addDays, startOfWeek, toDateKey } from '@/lib/date'
+import { listScripts } from '@/data/database'
 import KakaoLoginPanel from '@/components/KakaoLoginPanel.vue'
 
 const weekdays = ['일', '월', '화', '수', '목', '금', '토']
@@ -234,11 +263,13 @@ const viewMode = ref<'week' | 'month'>('week')
 const selectedWeek = ref(startOfWeek(new Date()))
 const selectedMonth = ref(new Date(new Date().getFullYear(), new Date().getMonth(), 1))
 const selectedRecord = ref<MemorizationRecord | null>(null)
+const isEditorOpen = ref(false)
 const isDeleteConfirm = ref(false)
 const isMutating = ref(false)
 const editError = ref('')
 const editForm = reactive({
   recordDate: '',
+  scriptId: '',
   book: '',
   startChapter: 1,
   startVerse: 1,
@@ -252,9 +283,11 @@ const {
   isLoading,
   errorMessage,
   load,
+  save: saveRecord,
   update: updateRecord,
   remove: removeRecord,
 } = useMemorizationRecords()
+const scripts = listScripts()
 
 initialize()
 
@@ -283,6 +316,7 @@ const weekDays = computed(() =>
       weekday: weekdays[index],
       day: date.getDate(),
       isToday: key === todayKey,
+      isFuture: key > todayKey,
       record: recordsByDate.value.get(key),
     }
   }),
@@ -325,6 +359,7 @@ const monthCells = computed(() => {
     key: string
     day: number
     isToday: boolean
+    isFuture: boolean
     record?: MemorizationRecord
   } | null> = Array.from({ length: firstWeekday }, () => null)
 
@@ -334,6 +369,7 @@ const monthCells = computed(() => {
       key,
       day,
       isToday: key === todayKey,
+      isFuture: key > todayKey,
       record: recordsByDate.value.get(key),
     })
   }
@@ -364,9 +400,11 @@ const goThisMonth = () => {
 
 const openEditor = (record: MemorizationRecord) => {
   selectedRecord.value = record
+  isEditorOpen.value = true
   isDeleteConfirm.value = false
   editError.value = ''
   editForm.recordDate = record.recordDate
+  editForm.scriptId = record.scriptId
   editForm.book = record.book
   editForm.startChapter = record.startChapter
   editForm.startVerse = record.startVerse
@@ -374,23 +412,48 @@ const openEditor = (record: MemorizationRecord) => {
   editForm.endVerse = record.endVerse
 }
 
+const applySelectedScriptDefaults = () => {
+  const selectedScript = scripts.find((item) => item.id === editForm.scriptId)
+  if (!selectedScript) return
+
+  editForm.book = selectedScript.meta?.[0]?.match(/^([가-힣A-Za-z]+)/)?.[1] || selectedScript.title
+  const chapter = Number(selectedScript.meta?.[0]?.match(/(\d+)/)?.[1]) || 1
+  editForm.startChapter = chapter
+  editForm.startVerse = 1
+  editForm.endChapter = chapter
+  editForm.endVerse = 1
+}
+
+const openCreator = (recordDate: string) => {
+  if (recordDate > todayKey) return
+  selectedRecord.value = null
+  isEditorOpen.value = true
+  isDeleteConfirm.value = false
+  editError.value = ''
+  editForm.recordDate = recordDate
+  editForm.scriptId = scripts[0]?.id || ''
+  applySelectedScriptDefaults()
+}
+
 const closeEditor = () => {
   if (isMutating.value) return
+  isEditorOpen.value = false
   selectedRecord.value = null
   isDeleteConfirm.value = false
   editError.value = ''
 }
 
 const hasValidRange = () =>
+  editForm.scriptId &&
   editForm.book &&
   editForm.recordDate &&
+  editForm.recordDate <= todayKey &&
   [editForm.startChapter, editForm.startVerse, editForm.endChapter, editForm.endVerse].every(
     (value) => Number.isInteger(value) && value > 0,
   )
 
 const saveChanges = async () => {
   const currentRecord = selectedRecord.value
-  if (!currentRecord) return
   editError.value = ''
 
   if (!hasValidRange()) {
@@ -408,7 +471,7 @@ const saveChanges = async () => {
   }
 
   const recordOnNewDate = records.value.find(
-    (record) => record.recordDate === editForm.recordDate && record.id !== currentRecord.id,
+    (record) => record.recordDate === editForm.recordDate && record.id !== currentRecord?.id,
   )
   if (recordOnNewDate) {
     editError.value = '선택한 날짜에 이미 다른 암송 기록이 있습니다.'
@@ -418,19 +481,28 @@ const saveChanges = async () => {
   isMutating.value = true
 
   try {
-    await updateRecord({
-      ...currentRecord,
+    const record = {
+      ...(currentRecord || {}),
+      userId: user.value!.id,
       recordDate: editForm.recordDate,
+      scriptId: editForm.scriptId,
       book: editForm.book,
       startChapter: editForm.startChapter,
       startVerse: editForm.startVerse,
       endChapter: editForm.endChapter,
       endVerse: editForm.endVerse,
       updatedAt: new Date().toISOString(),
-    })
+    }
+    if (currentRecord) await updateRecord(record)
+    else await saveRecord(record)
     closeEditor()
   } catch (error) {
-    editError.value = error instanceof Error ? error.message : '암송 기록을 수정하지 못했습니다.'
+    editError.value =
+      error instanceof Error
+        ? error.message
+        : currentRecord
+          ? '암송 기록을 수정하지 못했습니다.'
+          : '암송 기록을 저장하지 못했습니다.'
   } finally {
     isMutating.value = false
     if (!editError.value) closeEditor()
@@ -634,6 +706,19 @@ const formatRange = (record: MemorizationRecord) => {
   font-size: 13px;
 }
 
+.emptyAction {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  padding: 8px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.emptyAction:disabled {
+  cursor: default;
+}
+
 .calendar {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
@@ -670,6 +755,16 @@ const formatRange = (record: MemorizationRecord) => {
 
 .calendarDay.hasRecord {
   cursor: pointer;
+}
+
+.calendarDay.canCreate {
+  cursor: pointer;
+}
+
+.calendarDay.canCreate:hover,
+.calendarDay.canCreate:focus-visible {
+  background: #f3f4f6;
+  outline: none;
 }
 
 .calendarDay.hasRecord:focus-visible {
@@ -765,7 +860,8 @@ const formatRange = (record: MemorizationRecord) => {
   font-weight: 800;
 }
 
-.editField input {
+.editField input,
+.editField select {
   width: 100%;
   height: 44px;
   border: 1px solid rgba(0, 0, 0, 0.12);

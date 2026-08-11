@@ -29,10 +29,19 @@
     <!-- Blocks -->
     <div class="grid gap-5 py-3 pb-6">
       <section v-for="(b, bi) in script.blocks" :key="bi">
-        <div class="blockTitle">{{ b.label }}</div>
+        <div v-if="getChapterHeading(bi)" class="chapterHeading">
+          {{ getChapterHeading(bi) }}
+        </div>
+        <div v-if="!hideSubtitles" class="blockTitle">{{ b.label }}</div>
 
         <div class="space-y-1">
-          <div v-for="(line, li) in b.lines" :key="li" class="select-none" @click="toggle(bi, li)">
+          <div
+            v-for="(line, li) in b.lines"
+            :key="li"
+            class="verseLine select-none"
+            :data-reference="getLineReferenceKey(b.label, line)"
+            @click="toggle(bi, li)"
+          >
             <span class="verseText">
               <template v-for="(w, wi) in getWords(bi, li, line)" :key="wi">
                 <span
@@ -69,48 +78,16 @@
             <KakaoLoginPanel />
           </template>
 
-          <template v-else-if="existingRecord">
-            <div class="recordHeader">
-              <div>
-                <div class="recordTitle">이 날짜의 기록을 변경할까요?</div>
-                <p class="recordDesc">같은 날짜에는 하나의 암송 기록만 저장됩니다.</p>
-              </div>
-            </div>
-
-            <div class="changeSummary">
-              <div>
-                <span>기존</span>
-                {{ formatRange(existingRecord) }}
-              </div>
-              <div>
-                <span>변경</span>
-                {{ formRange }}
-              </div>
-            </div>
-
-            <p v-if="recordError" class="recordError">{{ recordError }}</p>
-
-            <div class="recordActions">
-              <button
-                class="secondaryBtn"
-                type="button"
-                :disabled="isSaving"
-                @click="existingRecord = null"
-              >
-                돌아가기
-              </button>
-              <button class="primaryBtn" type="button" :disabled="isSaving" @click="persistRecord">
-                {{ isSaving ? '저장 중…' : '변경하기' }}
-              </button>
-            </div>
-          </template>
-
           <form v-else @submit.prevent="submitRecord">
             <div class="recordHeader">
               <div>
-                <div class="recordTitle">암송 기록</div>
+                <div class="recordTitle">{{ existingRecord ? '암송 기록 수정' : '암송 기록' }}</div>
                 <p class="recordDesc">
-                  열어본 절을 기준으로 범위를 입력했어요. 필요한 경우 수정해 주세요.
+                  {{
+                    existingRecord
+                      ? '오늘 저장한 암송 범위를 수정할 수 있어요.'
+                      : '열어본 절을 기준으로 범위를 입력했어요. 필요한 경우 수정해 주세요.'
+                  }}
                 </p>
               </div>
               <button class="closeBtn" type="button" aria-label="기록 창 닫기" @click="closeRecord">
@@ -179,7 +156,7 @@
                 취소
               </button>
               <button class="primaryBtn" type="submit" :disabled="isSaving">
-                {{ isSaving ? '확인 중…' : '기록 저장' }}
+                {{ isSaving ? '저장 중…' : existingRecord ? '수정 저장' : '기록 저장' }}
               </button>
             </div>
           </form>
@@ -189,7 +166,7 @@
   </section>
 </template>
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, reactive, watchEffect, ref } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, reactive, watch, watchEffect, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { getIndexById } from '@/data/database'
 import type { MemorizationScript } from '@/types/script'
@@ -198,6 +175,7 @@ import { useFontScale } from '@/composables/useFontScale'
 import { useScriptRevealControls } from '@/composables/useScriptRevealControls'
 import { useAuthSession } from '@/composables/useAuthSession'
 import { useMemorizationRecords } from '@/composables/useMemorizationRecords'
+import { usePersonalSettings } from '@/composables/usePersonalSettings'
 import { compareVerseReferences, getVerseReference } from '@/lib/verseReference'
 import { toDateKey } from '@/lib/date'
 import KakaoLoginPanel from '@/components/KakaoLoginPanel.vue'
@@ -207,7 +185,8 @@ import KakaoLoginPanel from '@/components/KakaoLoginPanel.vue'
 ========================= */
 const { fontPx } = useFontScale()
 const { user, initialize: initializeAuth } = useAuthSession()
-const { findByDate, save } = useMemorizationRecords()
+const { records, findByDate, load, save } = useMemorizationRecords()
+const { hideSubtitles, resumeFromLast } = usePersonalSettings()
 
 /* =========================
    Routing / data
@@ -282,6 +261,7 @@ const trackOpenedVerse = (bi: number, li: number) => {
 const { register, unregister } = useScriptRevealControls()
 
 onMounted(() => {
+  void initializeAuth()
   register({
     hideAll: () => setAllRevealed(false),
     revealAll: () => setAllRevealed(true),
@@ -307,6 +287,53 @@ const getWords = (bi: number, li: number, line: string) => {
   return wordsCache[k]
 }
 
+const getLineReferenceKey = (blockLabel: string | undefined, line: string) => {
+  const currentScript = script.value
+  if (!currentScript) return undefined
+  const reference = getVerseReference(currentScript, blockLabel, line)
+  return reference ? `${reference.chapter}:${reference.verse}` : undefined
+}
+
+let lastAutoScrollKey = ''
+
+watch(
+  [script, user, resumeFromLast],
+  async ([currentScript, currentUser, shouldResume]) => {
+    if (!currentScript || !currentUser || !shouldResume) return
+
+    await load(currentUser.id)
+    const latestRecord = records.value.find((record) => record.scriptId === currentScript.id)
+    if (!latestRecord) return
+
+    const scrollKey = `${currentScript.id}:${latestRecord.id || latestRecord.recordDate}`
+    if (scrollKey === lastAutoScrollKey) return
+    lastAutoScrollKey = scrollKey
+
+    await nextTick()
+    document
+      .querySelector(`[data-reference="${latestRecord.endChapter}:${latestRecord.endVerse}"]`)
+      ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  },
+  { immediate: true },
+)
+
+const getBlockReference = (bi: number) => {
+  const currentScript = script.value
+  const block = currentScript?.blocks[bi]
+  const firstLine = block?.lines[0]
+  if (!currentScript || !block || !firstLine) return null
+  return getVerseReference(currentScript, block.label, firstLine)
+}
+
+const getChapterHeading = (bi: number) => {
+  const current = getBlockReference(bi)
+  if (!current) return ''
+  const previous = bi > 0 ? getBlockReference(bi - 1) : null
+  return !previous || previous.chapter !== current.chapter
+    ? `${current.book} ${current.chapter}장`
+    : ''
+}
+
 const openedRange = computed(() => Object.values(openedVerses).sort(compareVerseReferences))
 
 const openedRangeLabel = computed(() => {
@@ -319,26 +346,6 @@ const openedRangeLabel = computed(() => {
   }
 
   return `${first.book} ${first.chapter}장 ${first.verse}절–${last.chapter}장 ${last.verse}절`
-})
-
-const formRange = computed(() => {
-  if (
-    !recordForm.book ||
-    !recordForm.startChapter ||
-    !recordForm.startVerse ||
-    !recordForm.endChapter ||
-    !recordForm.endVerse
-  ) {
-    return '범위를 입력해 주세요'
-  }
-
-  return formatRange({
-    book: recordForm.book,
-    startChapter: recordForm.startChapter!,
-    startVerse: recordForm.startVerse!,
-    endChapter: recordForm.endChapter!,
-    endVerse: recordForm.endVerse!,
-  })
 })
 
 const openRecord = async () => {
@@ -360,6 +367,17 @@ const openRecord = async () => {
   recordForm.startVerse = first?.verse ?? null
   recordForm.endChapter = last?.chapter ?? null
   recordForm.endVerse = last?.verse ?? null
+
+  if (user.value) {
+    existingRecord.value = (await findByDate(user.value.id, todayKey)) ?? null
+    if (existingRecord.value) {
+      recordForm.book = existingRecord.value.book
+      recordForm.startChapter = existingRecord.value.startChapter
+      recordForm.startVerse = existingRecord.value.startVerse
+      recordForm.endChapter = existingRecord.value.endChapter
+      recordForm.endVerse = existingRecord.value.endVerse
+    }
+  }
   isRecordOpen.value = true
 }
 
@@ -401,29 +419,10 @@ const submitRecord = async () => {
   isSaving.value = true
 
   try {
-    const savedRecord = await findByDate(user.value.id, recordForm.recordDate)
-    if (savedRecord) {
-      existingRecord.value = savedRecord
-      return
-    }
-
     await saveRecord()
   } catch (error) {
     recordError.value =
       error instanceof Error ? error.message : '기존 암송 기록을 확인하지 못했습니다.'
-  } finally {
-    isSaving.value = false
-  }
-}
-
-const persistRecord = async () => {
-  recordError.value = ''
-  isSaving.value = true
-
-  try {
-    await saveRecord()
-  } catch (error) {
-    recordError.value = error instanceof Error ? error.message : '암송 기록을 저장하지 못했습니다.'
   } finally {
     isSaving.value = false
   }
@@ -457,18 +456,6 @@ const saveRecord = async () => {
   router.push('/records')
 }
 
-const formatRange = (
-  record: Pick<
-    MemorizationRecord,
-    'book' | 'startChapter' | 'startVerse' | 'endChapter' | 'endVerse'
-  >,
-) => {
-  if (record.startChapter === record.endChapter) {
-    return `${record.book} ${record.startChapter}장 ${record.startVerse}–${record.endVerse}절`
-  }
-
-  return `${record.book} ${record.startChapter}장 ${record.startVerse}절–${record.endChapter}장 ${record.endVerse}절`
-}
 </script>
 
 <style scoped>
@@ -499,6 +486,14 @@ const formatRange = (
   font-size: calc(14px * var(--scale, 1));
 }
 
+.chapterHeading {
+  margin: 10px 0 12px;
+  border-bottom: 2px solid #111827;
+  padding-bottom: 7px;
+  font-size: calc(17px * var(--scale, 1));
+  font-weight: 900;
+}
+
 .verseText {
   display: block;
   font-size: var(--font-px, 15px);
@@ -506,6 +501,10 @@ const formatRange = (
   letter-spacing: -0.15px;
   word-break: keep-all;
   white-space: pre-wrap;
+}
+
+.verseLine {
+  scroll-margin-top: 68px;
 }
 
 .word {
@@ -670,25 +669,6 @@ const formatRange = (
   border: 1px solid rgba(0, 0, 0, 0.12);
   background: white;
   color: #374151;
-}
-
-.changeSummary {
-  display: grid;
-  gap: 10px;
-}
-
-.changeSummary div {
-  display: grid;
-  gap: 4px;
-  border-radius: 10px;
-  background: #f5f6f7;
-  padding: 12px;
-  font-weight: 800;
-}
-
-.changeSummary span {
-  color: rgba(0, 0, 0, 0.5);
-  font-size: 12px;
 }
 
 .recordModal-enter-active,

@@ -1,13 +1,19 @@
 <!-- src/App.vue -->
 <template>
-  <main class="app" :style="{ '--scale': scale }">
+  <main class="app" :class="{ dark: isDarkMode }" :style="{ '--scale': scale }">
     <header class="topbar">
       <button v-if="showBack" class="navBtn" type="button" aria-label="뒤로 가기" @click="goBack">
         ←
       </button>
       <div v-else class="navSpacer" />
 
-      <div class="text-center text-[28px] font-bold text-gray-800">암송 도우미</div>
+      <RouterLink
+        class="appTitle text-center text-[28px] font-bold text-gray-800"
+        to="/"
+        aria-label="암송 도우미 홈으로 이동"
+      >
+        암송 도우미
+      </RouterLink>
 
       <div class="menu">
         <button
@@ -16,7 +22,7 @@
           aria-label="메뉴 열기"
           :aria-expanded="isMenuOpen"
           aria-controls="header-menu"
-          @click="isMenuOpen = !isMenuOpen"
+          @click="toggleMenu"
         >
           <span />
           <span />
@@ -25,45 +31,70 @@
 
         <Transition name="menuPanel">
           <div v-if="isMenuOpen" id="header-menu" class="menuPanel">
-            <div class="menuSection">
-              <div class="menuLabel">글자 크기</div>
-              <div class="fontCtl">
-                <button class="fontBtn" type="button" aria-label="글씨 작게" @click="decFont">
-                  −
+            <template v-if="menuDepth === 'main'">
+              <div class="menuSection">
+                <div class="menuLabel">글자 크기</div>
+                <div class="fontCtl">
+                  <button class="fontBtn" type="button" aria-label="글씨 작게" @click="decFont">
+                    −
+                  </button>
+                  <span class="fontSize">{{ fontPx }}px</span>
+                  <button class="fontBtn" type="button" aria-label="글씨 크게" @click="incFont">
+                    +
+                  </button>
+                </div>
+              </div>
+
+              <div v-if="revealControls" class="menuSection">
+                <div class="menuLabel">암송</div>
+                <div class="revealCtl">
+                  <button class="menuActionBtn" type="button" @click="hideAll">전체 가리기</button>
+                  <button class="menuActionBtn" type="button" @click="revealAll">전체 열기</button>
+                </div>
+
+                <button class="recordBtn" type="button" @click="openRecord">암송 기록하기</button>
+              </div>
+
+              <button class="depthLink" type="button" @click="menuDepth = 'settings'">
+                설정
+                <span>›</span>
+              </button>
+
+              <RouterLink class="recordsLink" to="/records" @click="isMenuOpen = false">
+                암송 기록 보기
+                <span>›</span>
+              </RouterLink>
+
+              <RouterLink class="recordsLink" to="/updates" @click="isMenuOpen = false">
+                업데이트 노트
+                <span>›</span>
+              </RouterLink>
+
+              <KakaoLoginPanel menu />
+            </template>
+
+            <template v-else>
+              <div class="depthHeader">
+                <button type="button" aria-label="메인 메뉴로 돌아가기" @click="menuDepth = 'main'">
+                  ‹
                 </button>
-                <span class="fontSize">{{ fontPx }}px</span>
-                <button class="fontBtn" type="button" aria-label="글씨 크게" @click="incFont">
-                  +
-                </button>
+                <strong>설정</strong>
               </div>
-            </div>
-
-            <div v-if="revealControls" class="menuSection">
-              <div class="menuLabel">암송</div>
-              <div class="revealCtl">
-                <button class="menuActionBtn" type="button" @click="hideAll">전체 가리기</button>
-                <button class="menuActionBtn" type="button" @click="revealAll">전체 열기</button>
+              <div class="settingsPanel">
+                <label class="settingRow">
+                  <span>다크 모드</span>
+                  <input v-model="isDarkMode" type="checkbox" role="switch" />
+                </label>
+                <label class="settingRow">
+                  <span>소제목 가리기</span>
+                  <input v-model="hideSubtitles" type="checkbox" role="switch" />
+                </label>
+                <label class="settingRow">
+                  <span>마지막 기록에서 시작</span>
+                  <input v-model="resumeFromLast" type="checkbox" role="switch" />
+                </label>
               </div>
-
-              <div class="recordSummary">
-                <span>열어본 범위</span>
-                <strong>{{ revealControls.getRecordLabel() }}</strong>
-              </div>
-
-              <button class="recordBtn" type="button" @click="openRecord">암송 기록하기</button>
-            </div>
-
-            <RouterLink class="recordsLink" to="/records" @click="isMenuOpen = false">
-              암송 기록 보기
-              <span>›</span>
-            </RouterLink>
-
-            <RouterLink class="recordsLink" to="/updates" @click="isMenuOpen = false">
-              업데이트 노트
-              <span>›</span>
-            </RouterLink>
-
-            <KakaoLoginPanel menu />
+            </template>
           </div>
         </Transition>
       </div>
@@ -74,7 +105,7 @@
       class="menuBackdrop"
       type="button"
       aria-label="메뉴 닫기"
-      @click="isMenuOpen = false"
+      @click="closeMenu"
     />
 
     <Transition name="updateModal">
@@ -101,20 +132,33 @@ import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useFontScale } from '@/composables/useFontScale'
 import { useScriptRevealControls } from '@/composables/useScriptRevealControls'
+import { usePersonalSettings } from '@/composables/usePersonalSettings'
 import { UPDATE_NOTE_STORAGE_KEY } from '@/data/updateNotes'
 import KakaoLoginPanel from '@/components/KakaoLoginPanel.vue'
 import UpdateNotesContent from '@/components/UpdateNotesContent.vue'
 
 const { fontPx, scale, incFont, decFont } = useFontScale()
 const { controls: revealControls } = useScriptRevealControls()
+const { isDarkMode, hideSubtitles, resumeFromLast } = usePersonalSettings()
 
 const router = useRouter()
 const route = useRoute()
 const isMenuOpen = ref(false)
+const menuDepth = ref<'main' | 'settings'>('main')
 const isUpdateOpen = ref(localStorage.getItem(UPDATE_NOTE_STORAGE_KEY) !== '1')
 const dontShowUpdateAgain = ref(false)
 
 const showBack = computed(() => route.path !== '/')
+
+const toggleMenu = () => {
+  isMenuOpen.value = !isMenuOpen.value
+  menuDepth.value = 'main'
+}
+
+const closeMenu = () => {
+  isMenuOpen.value = false
+  menuDepth.value = 'main'
+}
 
 const goBack = () => {
   if (window.history.length > 1) {
@@ -150,6 +194,7 @@ watch(
   () => route.path,
   () => {
     isMenuOpen.value = false
+    menuDepth.value = 'main'
   },
 )
 </script>
@@ -171,6 +216,11 @@ watch(
   align-items: center;
   background: white;
   border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.appTitle {
+  color: inherit;
+  text-decoration: none;
 }
 
 .navBtn {
@@ -271,6 +321,49 @@ watch(
   font-weight: 800;
 }
 
+.settingRow {
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: #374151;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.settingRow input {
+  position: relative;
+  width: 38px;
+  height: 21px;
+  appearance: none;
+  border-radius: 999px;
+  background: #d1d5db;
+  accent-color: #111827;
+  cursor: pointer;
+  transition: background 0.18s ease;
+}
+
+.settingRow input::after {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  background: white;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+  content: '';
+  transition: transform 0.18s ease;
+}
+
+.settingRow input:checked {
+  background: #168553;
+}
+
+.settingRow input:checked::after {
+  transform: translateX(17px);
+}
+
 .revealCtl {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -291,26 +384,6 @@ watch(
   transform: scale(0.98);
 }
 
-.recordSummary {
-  margin-top: 12px;
-  display: grid;
-  gap: 3px;
-  border-radius: 9px;
-  background: #f5f6f7;
-  padding: 10px 11px;
-}
-
-.recordSummary span {
-  color: rgba(0, 0, 0, 0.5);
-  font-size: 11px;
-  font-weight: 700;
-}
-
-.recordSummary strong {
-  color: #374151;
-  font-size: 13px;
-}
-
 .recordBtn {
   width: 100%;
   min-height: 42px;
@@ -321,6 +394,53 @@ watch(
   color: white;
   font-weight: 900;
   cursor: pointer;
+}
+
+.depthLink,
+.depthHeader {
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.depthLink {
+  width: 100%;
+  justify-content: space-between;
+  border-top: 0;
+  border-right: 0;
+  border-left: 0;
+  background: transparent;
+  padding: 0 14px;
+  color: #1f2937;
+  font-weight: 800;
+}
+
+.depthLink span {
+  color: rgba(0, 0, 0, 0.42);
+  font-size: 22px;
+}
+
+.depthHeader {
+  gap: 10px;
+  padding: 0 12px;
+}
+
+.depthHeader button {
+  width: 34px;
+  height: 34px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  font-size: 24px;
+}
+
+.depthHeader strong {
+  font-size: 15px;
+}
+
+.settingsPanel {
+  padding: 8px 14px 12px;
 }
 
 .recordBtn:active {
