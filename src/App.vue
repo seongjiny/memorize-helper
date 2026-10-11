@@ -95,6 +95,10 @@
                 </label>
               </div>
             </template>
+            <div class="menuSection menuLabel appVersion" aria-label="앱 버전 정보">
+              <span>v{{ appVersion }}</span>
+              <span>{{ buildCommit === 'unknown' ? '빌드 정보 없음' : `빌드 ${buildCommit}` }}</span>
+            </div>
           </div>
         </Transition>
       </div>
@@ -136,6 +140,9 @@ import { usePersonalSettings } from '@/composables/usePersonalSettings'
 import { UPDATE_NOTE_STORAGE_KEY } from '@/data/updateNotes'
 import KakaoLoginPanel from '@/components/KakaoLoginPanel.vue'
 import UpdateNotesContent from '@/components/UpdateNotesContent.vue'
+
+const appVersion = __APP_VERSION__
+const buildCommit = __BUILD_COMMIT__
 
 const { fontPx, scale, incFont, decFont } = useFontScale()
 const { controls: revealControls } = useScriptRevealControls()
@@ -290,6 +297,15 @@ watch(
   color: rgba(0, 0, 0, 0.62);
   font-size: 13px;
   font-weight: 700;
+}
+
+.appVersion {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0;
+  border-bottom: 0;
+  font-size: 12px;
 }
 
 .fontCtl {
