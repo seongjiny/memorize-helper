@@ -56,7 +56,7 @@
     },
     {
       "id": 5,
-      "label": "Lust (Matthew 5:27–32)",
+      "label": "Lust (Matthew 5:27–30)",
       "lines": [
         "27.  “You have heard that it was said,  ‘You shall not commit adultery.’ ",
         "28. But I say to you that everyone who looks at a woman with lustful intent has already committed adultery with her in his heart. ",
@@ -66,7 +66,7 @@
     },
     {
       "id": 6,
-      "label": "Divorce (Matthew 5:27–32)",
+      "label": "Divorce (Matthew 5:31–32)",
       "lines": [
         "31.  “It was also said,  ‘Whoever divorces his wife, let him give her a certificate of divorce.’ ",
         "32. But I say to you that everyone who divorces his wife, except on the ground of sexual immorality, makes her commit adultery, and whoever marries a divorced woman commits adultery."
@@ -120,22 +120,16 @@
       "id": 11,
       "label": "The Lord’s Prayer (Matthew 6:5-15)",
       "lines": [
-        "5. “And when you pray, you must not be like the hypocrites. For they love to stand and pray in the synagogues and at the street corners, that they may be seen by others. Truly, I say to you, they have received their reward. ",
+        "5. “And when you pray, you must not be like the hypocrites. For they love to stand and pray in the synagogues and at the street corners, that they may be seen by others. Truly, I say to you, they have received their reward.",
         "6. But when you pray, go into your room and shut the door and pray to your Father who is in secret. And your Father who sees in secret will reward you.",
-        "7. “And when you pray, do not heap up empty phrases as the Gentiles do, for they think that they will be heard for their many words. ",
-        "8. Do not be like them, for your Father knows what you need before you ask him. ",
-        "9. Pray then like this:",
-        " “Our Father in heaven,",
-        " hallowed be your name. ",
-        "10. Your kingdom come,",
-        " your will be done, ",
-        " on earth as it is in heaven.",
-        "11. Give us this day our daily bread, ",
-        "12. and forgive us our debts,",
-        "as we also have forgiven our debtors.",
-        "13. And lead us not into temptation,",
-        "but deliver us from evil. ",
-        "14. For if you forgive others their trespasses, your heavenly Father will also forgive you, ",
+        "7. “And when you pray, do not heap up empty phrases as the Gentiles do, for they think that they will be heard for their many words.",
+        "8. Do not be like them, for your Father knows what you need before you ask him.",
+        "9. Pray then like this: “Our Father in heaven, hallowed be your name.",
+        "10. Your kingdom come, your will be done, on earth as it is in heaven.",
+        "11. Give us this day our daily bread,",
+        "12. and forgive us our debts, as we also have forgiven our debtors.",
+        "13. And lead us not into temptation, but deliver us from evil.",
+        "14. For if you forgive others their trespasses, your heavenly Father will also forgive you,",
         "15. but if you do not forgive others their trespasses, neither will your Father forgive your trespasses."
       ]
     },
@@ -201,15 +195,21 @@
     },
     {
       "id": 17,
-      "label": "The Golden Rule (Matthew 7:13-14)",
+      "label": "The Golden Rule (Matthew 7:12)",
       "lines": [
-        "12. “So whatever you wish that others would do to you, do also to them, for this is the Law and the Prophets.",
+        "12. “So whatever you wish that others would do to you, do also to them, for this is the Law and the Prophets."
+      ]
+    },
+    {
+      "id": 18,
+      "label": "The Narrow Gate (Matthew 7:13–14)",
+      "lines": [
         "13. “Enter by the narrow gate. For the gate is wide and the way is easy that leads to destruction, and those who enter by it are many. ",
         "14. For the gate is narrow and the way is hard that leads to life, and those who find it are few."
       ]
     },
     {
-      "id": 18,
+      "id": 19,
       "label": "A Tree and Its Fruit (Matthew 7:15-20)",
       "lines": [
         "15. “Beware of false prophets, who come to you in sheep’s clothing but inwardly are ravenous wolves. ",
@@ -221,13 +221,18 @@
       ]
     },
     {
-      "id": 19,
-      "label": "I Never Knew You (Matthew 7:21-27)",
+      "id": 20,
+      "label": "I Never Knew You (Matthew 7:21–23)",
       "lines": [
         "21. “Not everyone who says to me, ‘Lord, Lord,’ will enter the kingdom of heaven, but the one who does the will of my Father who is in heaven. ",
         "22. On that day many will say to me, ‘Lord, Lord, did we not prophesy in your name, and cast out demons in your name, and do many mighty works in your name?’ ",
-        "23. And then will I declare to them, ‘I never knew you; depart from me, you workers of lawlessness.’",
-        "Build Your House on the Rock",
+        "23. And then will I declare to them, ‘I never knew you; depart from me, you workers of lawlessness.’"
+      ]
+    },
+    {
+      "id": 21,
+      "label": "Build Your House on the Rock (Matthew 7:24–27)",
+      "lines": [
         "24. “Everyone then who hears these words of mine and does them will be like a wise man who built his house on the rock. ",
         "25. And the rain fell, and the floods came, and the winds blew and beat on that house, but it did not fall, because it had been founded on the rock. ",
         "26. And everyone who hears these words of mine and does not do them will be like a foolish man who built his house on the sand. ",
@@ -235,7 +240,7 @@
       ]
     },
     {
-      "id": 20,
+      "id": 22,
       "label": "The Authority of Jesus (Matthew 7:28-29)",
       "lines": [
         "28. And when Jesus finished these sayings, the crowds were astonished at his teaching, ",

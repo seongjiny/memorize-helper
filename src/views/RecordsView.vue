@@ -125,7 +125,13 @@
                 canCreate: day && !day.record && !day.isFuture,
               }"
               :disabled="!day || day.isFuture"
-              :title="day?.record ? formatRange(day.record) : day && !day.isFuture ? '암송 기록 추가' : undefined"
+              :title="
+                day?.record
+                  ? formatRange(day.record)
+                  : day && !day.isFuture
+                    ? '암송 기록 추가'
+                    : undefined
+              "
               @click="day && (day.record ? openEditor(day.record) : openCreator(day.key))"
             >
               <template v-if="day">
@@ -267,6 +273,7 @@ const isEditorOpen = ref(false)
 const isDeleteConfirm = ref(false)
 const isMutating = ref(false)
 const editError = ref('')
+let editorSession = 0
 const editForm = reactive({
   recordDate: '',
   scriptId: '',
@@ -292,9 +299,21 @@ const scripts = listScripts()
 initialize()
 
 watch(
-  user,
-  (currentUser) => {
-    if (currentUser) void load(currentUser.id)
+  () => user.value?.id,
+  () => {
+    editorSession += 1
+    isEditorOpen.value = false
+    selectedRecord.value = null
+    isDeleteConfirm.value = false
+    editError.value = ''
+  },
+  { flush: 'sync' },
+)
+
+watch(
+  () => user.value?.id,
+  (userId) => {
+    if (userId) void load(userId)
   },
   { immediate: true },
 )
@@ -453,6 +472,8 @@ const hasValidRange = () =>
   )
 
 const saveChanges = async () => {
+  if (!user.value || isMutating.value) return
+  const session = editorSession
   const currentRecord = selectedRecord.value
   editError.value = ''
 
@@ -495,8 +516,8 @@ const saveChanges = async () => {
     }
     if (currentRecord) await updateRecord(record)
     else await saveRecord(record)
-    closeEditor()
   } catch (error) {
+    if (session !== editorSession) return
     editError.value =
       error instanceof Error
         ? error.message
@@ -505,11 +526,13 @@ const saveChanges = async () => {
           : '암송 기록을 저장하지 못했습니다.'
   } finally {
     isMutating.value = false
-    if (!editError.value) closeEditor()
+    if (session === editorSession && !editError.value) closeEditor()
   }
 }
 
 const deleteRecord = async () => {
+  if (!user.value || isMutating.value) return
+  const session = editorSession
   const currentRecord = selectedRecord.value
   if (!currentRecord) return
   editError.value = ''
@@ -518,10 +541,11 @@ const deleteRecord = async () => {
   try {
     await removeRecord(currentRecord)
   } catch (error) {
+    if (session !== editorSession) return
     editError.value = error instanceof Error ? error.message : '암송 기록을 삭제하지 못했습니다.'
   } finally {
     isMutating.value = false
-    if (!editError.value) closeEditor()
+    if (session === editorSession && !editError.value) closeEditor()
   }
 }
 
