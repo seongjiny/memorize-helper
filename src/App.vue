@@ -65,6 +65,11 @@
                 <span>›</span>
               </RouterLink>
 
+              <RouterLink class="recordsLink" to="/achievements" @click="isMenuOpen = false">
+                나의 성취
+                <span>›</span>
+              </RouterLink>
+
               <RouterLink class="recordsLink" to="/updates" @click="isMenuOpen = false">
                 업데이트 노트
                 <span>›</span>

@@ -2,6 +2,76 @@
 @tailwind components;
 @tailwind utilities;
 
+.app {
+  --practice-surface: #ffffff;
+  --practice-soft: #f3f4f6;
+  --practice-text: #111827;
+  --practice-muted: #4b5563;
+  --practice-border: #d1d5db;
+  --practice-accent: #087443;
+  --practice-accent-soft: #e8f5ed;
+}
+
+.app.dark {
+  --practice-surface: #1f2937;
+  --practice-soft: #374151;
+  --practice-text: #f3f4f6;
+  --practice-muted: #b9c4d2;
+  --practice-border: #526074;
+  --practice-accent: #6ee7b7;
+  --practice-accent-soft: #164e3b;
+}
+
+.practicePanel {
+  margin-bottom: 16px;
+  border: 1px solid var(--practice-border);
+  border-radius: 14px;
+  background: var(--practice-surface);
+  padding: 16px;
+  color: var(--practice-text);
+  overflow-wrap: anywhere;
+}
+
+.practiceHeading {
+  font-size: clamp(17px, calc(17px * var(--scale, 1)), 24px);
+  font-weight: 800;
+  line-height: 1.4;
+}
+
+.practiceMuted {
+  color: var(--practice-muted);
+  font-size: clamp(13px, calc(13px * var(--scale, 1)), 18px);
+  line-height: 1.6;
+}
+
+.practiceLink {
+  color: var(--practice-accent);
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.practiceAction {
+  min-height: 44px;
+  border: 1px solid var(--practice-border);
+  border-radius: 8px;
+  background: var(--practice-surface);
+  padding: 8px 12px;
+  color: var(--practice-text);
+  font-weight: 700;
+}
+
+.practiceAction:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.practiceAction:focus-visible,
+.practiceLink:focus-visible {
+  outline: 2px solid var(--practice-accent);
+  outline-offset: 3px;
+}
+
 html,
 body,
 #app {

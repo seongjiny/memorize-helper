@@ -17,6 +17,14 @@
       {{ script.title }}
     </div>
 
+    <div class="scriptModes" role="group" aria-label="본문 보기 모드">
+      <button type="button" :aria-pressed="isReading" @click="setMode('read')">읽기</button>
+      <button type="button" :aria-pressed="!isReading" @click="setMode('memorize')">암송</button>
+    </div>
+    <p v-if="isReading" class="readingHint">
+      본문을 펼쳐 읽는 모드입니다. 암송 기록은 자동으로 저장되지 않아요.
+    </p>
+
     <!-- Meta -->
     <div v-if="script.meta?.length || script.description" class="px-0 pt-3">
       <div v-if="script.description" class="desc">
@@ -42,11 +50,13 @@
           <div
             v-for="(line, li) in b.lines"
             :key="li"
-            class="verseLine select-none"
+            class="verseLine"
+            :class="{ 'select-none': !isReading, reading: isReading }"
             :data-reference="getLineReferenceKey(b.label, line)"
             @click="toggle(bi, li)"
           >
-            <span class="verseText">
+            <span v-if="isReading" class="verseText">{{ line }}</span>
+            <span v-else class="verseText">
               <template v-for="(w, wi) in getWords(bi, li, line)" :key="wi">
                 <span
                   class="word"
@@ -191,7 +201,7 @@ import { useAuthSession } from '@/composables/useAuthSession'
 import { useMemorizationRecords } from '@/composables/useMemorizationRecords'
 import { usePersonalSettings } from '@/composables/usePersonalSettings'
 import { compareVerseReferences, getVerseReference } from '@/lib/verseReference'
-import { toDateKey } from '@/lib/date'
+import { useToday } from '@/composables/useToday'
 import KakaoLoginPanel from '@/components/KakaoLoginPanel.vue'
 
 /* =========================
@@ -207,7 +217,11 @@ const { hideSubtitles, resumeFromLast } = usePersonalSettings()
 ========================= */
 const route = useRoute()
 const router = useRouter()
-const todayKey = toDateKey(new Date())
+const { todayKey } = useToday()
+const isReading = computed(() => route.query.mode === 'read')
+const setMode = (mode: 'read' | 'memorize') => {
+  void router.push({ path: route.path, query: { ...route.query, mode } })
+}
 
 const scriptId = computed(() => String(route.params.id || ''))
 const script = ref<MemorizationScript | null>(null)
@@ -220,7 +234,7 @@ let recordLookup = 0
 const existingRecord = ref<MemorizationRecord | null>(null)
 const recordError = ref('')
 const recordForm = reactive({
-  recordDate: todayKey,
+  recordDate: todayKey.value,
   book: '',
   startChapter: null as number | null,
   startVerse: null as number | null,
@@ -237,6 +251,7 @@ const openedVerses = reactive<Record<string, VerseReference>>({})
 const keyOf = (bi: number, li: number) => `${bi}-${li}`
 const isOpen = (bi: number, li: number) => revealed[keyOf(bi, li)] === true
 const toggle = (bi: number, li: number) => {
+  if (isReading.value) return
   const k = keyOf(bi, li)
   revealed[k] = !revealed[k]
 
@@ -246,6 +261,7 @@ const toggle = (bi: number, li: number) => {
 }
 
 const setAllRevealed = (isRevealed: boolean) => {
+  if (isReading.value) return
   script.value?.blocks.forEach((block, bi) => {
     block.lines.forEach((_, li) => {
       revealed[keyOf(bi, li)] = isRevealed
@@ -270,12 +286,6 @@ const { register, unregister } = useScriptRevealControls()
 
 onMounted(() => {
   void initializeAuth()
-  register({
-    hideAll: () => setAllRevealed(false),
-    revealAll: () => setAllRevealed(true),
-    getRecordLabel: () => openedRangeLabel.value,
-    openRecord,
-  })
 })
 
 onUnmounted(unregister)
@@ -355,13 +365,13 @@ const getLineReferenceKey = (blockLabel: string | undefined, line: string) => {
 }
 
 watch(
-  [script, user, resumeFromLast],
-  async ([currentScript, currentUser, shouldResume], _previous, onCleanup) => {
+  [script, user, resumeFromLast, isReading],
+  async ([currentScript, currentUser, shouldResume, reading], _previous, onCleanup) => {
     let cancelled = false
     onCleanup(() => {
       cancelled = true
     })
-    if (!currentScript || !currentUser || !shouldResume) return
+    if (!currentScript || !currentUser || !shouldResume || reading) return
 
     await load(currentUser.id)
     if (cancelled) return
@@ -416,7 +426,7 @@ const openedRangeLabel = computed(() => {
 
 const openRecord = async () => {
   await initializeAuth()
-  if (!script.value || isSaving.value) return
+  if (!script.value || isSaving.value || isReading.value) return
   const request = ++recordLookup
   const userId = user.value?.id
   existingRecord.value = null
@@ -434,7 +444,7 @@ const openRecord = async () => {
     currentScript?.meta?.[0]?.match(/^([가-힣A-Za-z]+)/)?.[1] ||
     currentScript?.title ||
     ''
-  recordForm.recordDate = todayKey
+  recordForm.recordDate = todayKey.value
   recordForm.startChapter = first?.chapter ?? null
   recordForm.startVerse = first?.verse ?? null
   recordForm.endChapter = last?.chapter ?? null
@@ -442,7 +452,7 @@ const openRecord = async () => {
 
   if (!userId) return
   try {
-    const record = await findByDate(userId, todayKey)
+    const record = await findByDate(userId, todayKey.value)
     if (request !== recordLookup || user.value?.id !== userId) return
     existingRecord.value = record ?? null
     if (existingRecord.value) {
@@ -477,7 +487,7 @@ const submitRecord = async () => {
 
   if (
     !recordForm.recordDate ||
-    recordForm.recordDate > todayKey ||
+    recordForm.recordDate > todayKey.value ||
     !recordForm.book ||
     !isPositiveInteger(recordForm.startChapter) ||
     !isPositiveInteger(recordForm.startVerse) ||
@@ -548,9 +558,63 @@ const saveRecord = async () => {
   if (original) await update(record)
   else await save(record)
 }
+
+watch(
+  [isReading, script],
+  ([reading, currentScript]) => {
+    if (reading || !currentScript) {
+      unregister()
+      recordLookup += 1
+      isRecordOpen.value = false
+      existingRecord.value = null
+      return
+    }
+    register({
+      hideAll: () => setAllRevealed(false),
+      revealAll: () => setAllRevealed(true),
+      getRecordLabel: () => openedRangeLabel.value,
+      openRecord,
+    })
+  },
+  { immediate: true, flush: 'sync' },
+)
 </script>
 
 <style scoped>
+.scriptModes {
+  display: flex;
+  gap: 4px;
+  margin: 12px 0;
+  border-radius: 10px;
+  padding: 4px;
+  background: var(--practice-soft, #f1f3f5);
+}
+
+.scriptModes button {
+  flex: 1;
+  min-height: 44px;
+  border-radius: 8px;
+  color: var(--practice-muted, #4b5563);
+  font-weight: 700;
+}
+
+.scriptModes button[aria-pressed='true'] {
+  background: var(--practice-surface, white);
+  color: var(--practice-text, #111827);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.readingHint {
+  color: var(--practice-muted, #4b5563);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.scriptModes button:focus-visible {
+  outline: 2px solid var(--practice-accent, #087443);
+  outline-offset: 2px;
+}
+
 .scriptTitle {
   margin-bottom: 8px;
   font-weight: 900;
@@ -597,6 +661,10 @@ const saveRecord = async () => {
 
 .verseLine {
   scroll-margin-top: 68px;
+}
+
+.verseLine.reading .verseText {
+  overflow-wrap: anywhere;
 }
 
 .word {

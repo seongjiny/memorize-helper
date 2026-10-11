@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs'
 const userA = '11111111-1111-4111-8111-111111111111'
 const userB = '22222222-2222-4222-8222-222222222222'
 const today = new Date().toLocaleDateString('en-CA')
-const api = 'https://review.example.test/**'
+const api = 'https://review.example.test/rest/v1/memorization_records**'
 const record = (userId = userA) => ({
   id: 1,
   user_id: userId,
@@ -47,6 +47,7 @@ const openRecord = async (page) => {
 }
 
 test.beforeEach(async ({ context }) => {
+  await context.route('**/rest/v1/update_notes**', (route) => route.fulfill({ json: [] }))
   await context.addInitScript(() => {
     localStorage.setItem('mh_hide_update_2026-08-11-memorization-experience', '1')
   })
