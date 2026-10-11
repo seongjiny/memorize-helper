@@ -40,6 +40,9 @@
           </div>
 
           <div v-if="user && progressByScript[s.id] !== undefined" class="progress">
+            <span v-if="progressByScript[s.id]!.isComplete" class="completionTrophy">
+              <span aria-hidden="true">🏆</span> 전체 기록 완료
+            </span>
             <div class="progressText">
               <span>기록 범위 진행률</span>
               <strong>{{ progressByScript[s.id]!.percentage }}%</strong>

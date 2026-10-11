@@ -130,11 +130,14 @@ test('record creation and deletion update the calendar and achievement condition
   await expect(page.getByRole('dialog')).toHaveCount(0)
   await page.getByRole('link', { name: '암송 도우미 홈으로 이동' }).click()
   await expect(page.locator('.activitySummary')).toHaveText('이번 달 3일 기록 · 현재 3일 연속')
+  await expect(page.locator('.scriptCard .completionTrophy')).toHaveText('🏆 전체 기록 완료')
   await page.getByRole('link', { name: '나의 성취 보기 →' }).click()
   await expect(page.locator('[data-achievement="three-day-streak"] .badgeStatus')).toHaveText(
     '달성',
   )
   await expect(page.locator('[data-achievement="complete-script"] .badgeStatus')).toHaveText('달성')
+  await expect(page.locator('[data-achievement="complete-script"] .badgeIcon')).toHaveText('🏆')
+  await expect(page.locator('.scriptProgressList .completionTrophy')).toHaveCount(1)
   await page.goto('/records?date=2026-10-09&view=month')
   await page.locator('.calendarDay.selected').click()
   await page.getByRole('button', { name: '삭제', exact: true }).click()
@@ -142,6 +145,7 @@ test('record creation and deletion update the calendar and achievement condition
   await expect(page.getByRole('dialog')).toHaveCount(0)
   await page.getByRole('link', { name: '암송 도우미 홈으로 이동' }).click()
   await expect(page.locator('.activitySummary')).toHaveText('이번 달 2일 기록 · 현재 2일 연속')
+  await expect(page.locator('.scriptCard .completionTrophy')).toHaveCount(0)
   await page.getByRole('link', { name: '나의 성취 보기 →' }).click()
   await expect(page.locator('[data-achievement="three-day-streak"] .badgeStatus')).toHaveText(
     '진행 중',
@@ -149,6 +153,7 @@ test('record creation and deletion update the calendar and achievement condition
   await expect(page.locator('[data-achievement="complete-script"] .badgeStatus')).toHaveText(
     '진행 중',
   )
+  await expect(page.locator('.scriptProgressList .completionTrophy')).toHaveCount(0)
 })
 
 test('history errors are retryable and do not become zero-day summaries', async ({
@@ -293,9 +298,49 @@ test('completion uses exact coverage rather than a rounded 100 percent', async (
     ]
     return getScriptProgress(script, records)
   })
-  expect(progress.percentage).toBe(100)
+  expect(progress.percentage).toBe(99)
   expect(progress.coveredVerses).toBe(499)
   expect(progress.isComplete).toBe(false)
+})
+
+test('trophies and 100 percent require every verse and remain visible after reload', async ({
+  page,
+  context,
+}) => {
+  await authenticate(context)
+  let endVerse = 499
+  await page.route(recordsApi, (route) =>
+    route.fulfill({ json: [record('2026-10-10', { end_verse: endVerse })] }),
+  )
+  await page.route('**/scripts/romans-8-kk.json', (route) =>
+    route.fulfill({
+      json: {
+        id: 'romans-8',
+        title: '로마서 8장',
+        blocks: [
+          {
+            id: 1,
+            label: '롬 8:1–500',
+            lines: Array.from({ length: 500 }, (_, i) => `${i + 1}. 본문`),
+          },
+        ],
+      },
+    }),
+  )
+  await page.goto('/')
+  const card = page
+    .locator('.scriptCard')
+    .filter({ has: page.getByText('로마서 8장', { exact: true }) })
+  await expect(card.locator('.progressText strong')).toHaveText('99%')
+  await expect(page.locator('.completionTrophy')).toHaveCount(0)
+  endVerse = 500
+  await page.reload()
+  await expect(card.locator('.progressText strong')).toHaveText('100%')
+  await expect(card.locator('.completionTrophy')).toHaveText('🏆 전체 기록 완료')
+  await page.getByRole('link', { name: '나의 성취 보기 →' }).click()
+  await expect(page.locator('.scriptProgressList .completionTrophy')).toHaveCount(1)
+  await page.reload()
+  await expect(page.locator('.scriptProgressList .completionTrophy')).toHaveCount(1)
 })
 
 test.describe('daylight saving dates', () => {
@@ -324,7 +369,9 @@ test('new screens fit a narrow viewport with large fonts and dark mode', async (
     localStorage.setItem('mh_dark_mode', '1')
   })
   await page.setViewportSize({ width: 320, height: 760 })
-  await page.route(recordsApi, (route) => route.fulfill({ json: [record()] }))
+  await page.route(recordsApi, (route) =>
+    route.fulfill({ json: [record('2026-10-10', { end_verse: 39 })] }),
+  )
   for (const path of ['/', '/achievements', '/script/romans-8?mode=read']) {
     await page.goto(path)
     await expect(page.locator('.app')).toHaveClass(/dark/)

@@ -43,10 +43,15 @@ export const getScriptProgress = (script: MemorizationScript, records: Memorizat
   }
   const totalVerses = verses.size
   const coveredVerses = covered.size
+  const isComplete = totalVerses > 0 && coveredVerses === totalVerses
   return {
     totalVerses,
     coveredVerses,
-    percentage: totalVerses ? Math.round((coveredVerses / totalVerses) * 100) : 0,
-    isComplete: totalVerses > 0 && coveredVerses === totalVerses,
+    percentage: isComplete
+      ? 100
+      : totalVerses
+        ? Math.min(99, Math.round((coveredVerses / totalVerses) * 100))
+        : 0,
+    isComplete,
   }
 }

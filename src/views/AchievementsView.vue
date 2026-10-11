@@ -50,7 +50,7 @@
           data-achievement="complete-script"
         >
           <div class="badgeHeader">
-            <span class="badgeIcon" aria-hidden="true">{{ completedScript ? '✓' : '○' }}</span>
+            <span class="badgeIcon" aria-hidden="true">{{ completedScript ? '🏆' : '○' }}</span>
             <h2 class="practiceHeading">한 자료의 모든 절</h2>
             <span class="badgeStatus">{{
               completedScript
@@ -77,12 +77,15 @@
               <RouterLink class="practiceLink" :to="`/script/${item.id}`">{{
                 item.title
               }}</RouterLink>
-              <span v-if="progressByScript[item.id]"
-                >{{ progressByScript[item.id]!.coveredVerses }} /
-                {{ progressByScript[item.id]!.totalVerses }}절{{
-                  progressByScript[item.id]!.isComplete ? ' · 달성' : ''
-                }}</span
-              >
+              <template v-if="progressByScript[item.id]">
+                <span
+                  >{{ progressByScript[item.id]!.coveredVerses }} /
+                  {{ progressByScript[item.id]!.totalVerses }}절</span
+                >
+                <span v-if="progressByScript[item.id]!.isComplete" class="completionTrophy">
+                  <span aria-hidden="true">🏆</span> 전체 기록 완료
+                </span>
+              </template>
               <span v-else class="practiceMuted">{{
                 isLoadingScripts ? '조회 중' : '계산할 수 없음'
               }}</span>
