@@ -19,6 +19,12 @@ interface MemorizationRecordRow {
 const records = ref<MemorizationRecord[]>([])
 const isLoading = ref(false)
 const errorMessage = ref('')
+const lastSavedChange = ref<{
+  userId: string
+  before: MemorizationRecord[]
+  after: MemorizationRecord[]
+} | null>(null)
+let hasLoadedHistory = false
 const { user } = useAuthSession()
 let loadRequest = 0
 let sessionVersion = 0
@@ -31,6 +37,8 @@ watch(
     records.value = []
     isLoading.value = false
     errorMessage.value = ''
+    hasLoadedHistory = false
+    lastSavedChange.value = null
   },
   { flush: 'sync' },
 )
@@ -95,22 +103,28 @@ const load = async (userId: string) => {
       if (data.length < pageSize) break
     }
     records.value = rows.map(fromRow)
+    hasLoadedHistory = true
   } catch (error) {
     if (!isCurrent()) return
     records.value = []
+    hasLoadedHistory = false
     errorMessage.value = error instanceof Error ? error.message : '암송 기록을 불러오지 못했습니다.'
   } finally {
     if (isCurrent()) isLoading.value = false
   }
 }
 
-const applyChange = (userId: string, version: number, change: () => void) => {
+const applyChange = (userId: string, version: number, change: () => void, notify = false) => {
   if (version !== sessionVersion || user.value?.id !== userId) return
   const shouldReload = isLoading.value
   loadRequest += 1
   isLoading.value = false
   errorMessage.value = ''
+  const before = [...records.value]
   change()
+  if (notify && hasLoadedHistory) {
+    lastSavedChange.value = { userId, before, after: [...records.value] }
+  }
   if (shouldReload) void load(userId)
 }
 
@@ -131,6 +145,8 @@ const findByDate = async (userId: string, recordDate: string) => {
 
 const save = async (record: MemorizationRecord) => {
   const version = sessionVersion
+  if (!hasLoadedHistory) await load(record.userId)
+  if (version !== sessionVersion || user.value?.id !== record.userId) return
   const client = requireSupabase()
   const { data, error } = await client
     .from('memorization_records')
@@ -142,18 +158,25 @@ const save = async (record: MemorizationRecord) => {
 
   if (error?.code === '23505') throw new Error('선택한 날짜에 이미 다른 암송 기록이 있습니다.')
   if (error) throw error
-  applyChange(record.userId, version, () => {
-    const savedRecord = fromRow(data as MemorizationRecordRow)
-    const nextRecords = records.value.filter((item) => item.recordDate !== savedRecord.recordDate)
-    records.value = [...nextRecords, savedRecord].sort((a, b) =>
-      b.recordDate.localeCompare(a.recordDate),
-    )
-  })
+  applyChange(
+    record.userId,
+    version,
+    () => {
+      const savedRecord = fromRow(data as MemorizationRecordRow)
+      const nextRecords = records.value.filter((item) => item.recordDate !== savedRecord.recordDate)
+      records.value = [...nextRecords, savedRecord].sort((a, b) =>
+        b.recordDate.localeCompare(a.recordDate),
+      )
+    },
+    true,
+  )
 }
 
 const update = async (record: MemorizationRecord) => {
   const version = sessionVersion
   if (!record.id) throw new Error('수정할 암송 기록을 찾지 못했습니다.')
+  if (!hasLoadedHistory) await load(record.userId)
+  if (version !== sessionVersion || user.value?.id !== record.userId) return
 
   const client = requireSupabase()
   const { data, error } = await client
@@ -168,13 +191,18 @@ const update = async (record: MemorizationRecord) => {
 
   if (error?.code === '23505') throw new Error('선택한 날짜에 이미 다른 암송 기록이 있습니다.')
   if (error) throw error
-  applyChange(record.userId, version, () => {
-    const updatedRecord = fromRow(data as MemorizationRecordRow)
-    records.value = records.value
-      .filter((item) => item.id !== updatedRecord.id)
-      .concat(updatedRecord)
-      .sort((a, b) => b.recordDate.localeCompare(a.recordDate))
-  })
+  applyChange(
+    record.userId,
+    version,
+    () => {
+      const updatedRecord = fromRow(data as MemorizationRecordRow)
+      records.value = records.value
+        .filter((item) => item.id !== updatedRecord.id)
+        .concat(updatedRecord)
+        .sort((a, b) => b.recordDate.localeCompare(a.recordDate))
+    },
+    true,
+  )
 }
 
 const remove = async (record: MemorizationRecord) => {
@@ -195,5 +223,15 @@ const remove = async (record: MemorizationRecord) => {
 }
 
 export function useMemorizationRecords() {
-  return { records, isLoading, errorMessage, load, findByDate, save, update, remove }
+  return {
+    records,
+    isLoading,
+    errorMessage,
+    lastSavedChange,
+    load,
+    findByDate,
+    save,
+    update,
+    remove,
+  }
 }

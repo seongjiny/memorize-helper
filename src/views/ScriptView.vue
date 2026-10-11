@@ -18,8 +18,8 @@
     </div>
 
     <div class="scriptModes" role="group" aria-label="본문 보기 모드">
-      <button type="button" :aria-pressed="isReading" @click="setMode('read')">읽기</button>
       <button type="button" :aria-pressed="!isReading" @click="setMode('memorize')">암송</button>
+      <button type="button" :aria-pressed="isReading" @click="setMode('read')">읽기</button>
     </div>
     <p v-if="isReading" class="readingHint">
       본문을 펼쳐 읽는 모드입니다. 암송 기록은 자동으로 저장되지 않아요.
@@ -55,14 +55,13 @@
             :data-reference="getLineReferenceKey(b.label, line)"
             @click="toggle(bi, li)"
           >
-            <span v-if="isReading" class="verseText">{{ line }}</span>
-            <span v-else class="verseText">
+            <span class="verseText">
               <template v-for="(w, wi) in getWords(bi, li, line)" :key="wi">
                 <span
                   class="word"
                   :class="{
                     first: wi === 0,
-                    masked: wi !== 0 && !isOpen(bi, li),
+                    masked: !isReading && wi !== 0 && !isOpen(bi, li),
                   }"
                 >
                   {{ w }}
@@ -657,6 +656,8 @@ watch(
   letter-spacing: -0.15px;
   word-break: keep-all;
   white-space: pre-wrap;
+  -webkit-text-size-adjust: none;
+  text-size-adjust: none;
 }
 
 .verseLine {
@@ -669,7 +670,11 @@ watch(
 
 .word {
   display: inline-block;
+  max-width: 100%;
   padding: 0 2px;
+  font-size: inherit;
+  line-height: inherit;
+  overflow-wrap: anywhere;
 }
 
 .word.first {

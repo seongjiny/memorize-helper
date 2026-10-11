@@ -141,6 +141,7 @@
     </Transition>
 
     <RouterView />
+    <AchievementToast />
   </main>
 </template>
 
@@ -155,6 +156,7 @@ import { updateNoteStorageKey } from '@/lib/updateNote'
 import type { UpdateNote } from '@/types/updateNote'
 import KakaoLoginPanel from '@/components/KakaoLoginPanel.vue'
 import UpdateNotesContent from '@/components/UpdateNotesContent.vue'
+import AchievementToast from '@/components/AchievementToast.vue'
 
 const appVersion = __APP_VERSION__
 

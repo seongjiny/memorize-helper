@@ -71,10 +71,7 @@ test('reading URLs survive reload and history while invalid modes use memorizati
   await expect(page.locator('.masked').first()).toBeAttached()
 })
 
-test('home calendar shows streaks and opens the selected past date in records', async ({
-  page,
-  context,
-}) => {
+test('home calendar is a compact monthly preview linking to records', async ({ page, context }) => {
   await authenticate(context)
   const rows = [
     '2026-09-30',
@@ -87,19 +84,16 @@ test('home calendar shows streaks and opens the selected past date in records', 
   await page.route(recordsApi, (route) => route.fulfill({ json: rows }))
   await page.goto('/')
   await expect(page.locator('.activitySummary')).toHaveText('이번 달 5일 기록 · 현재 3일 연속')
-  await expect(page.locator('.activityNote').first()).toContainText('최장 3일 연속')
-  await expect(page.getByRole('button', { name: '다음 달', exact: true })).toBeDisabled()
-  await expect(
-    page.getByRole('button', { name: '2026-10-12, 기록 없음, 미래 날짜', exact: true }),
-  ).toBeDisabled()
+  await expect(page.locator('.activityDay.recorded')).toHaveCount(5)
+  await expect(page.locator('.activityDay')).toHaveCount(31)
+  await expect(page.locator('.activityCalendar button')).toHaveCount(0)
+  await expect(page.locator('.activityDetail')).toHaveCount(0)
+  expect((await page.locator('.activityCalendar').boundingBox()).height).toBeLessThan(250)
+  await page.getByRole('link', { name: '2026년 10월 기록 달력 전체 보기' }).click()
+  await expect(page).toHaveURL(/\/records\?date=2026-10-11&view=month/)
+  await expect(page.locator('.selectedDateLabel')).toHaveText('선택한 날짜: 2026-10-11')
   await page.getByRole('button', { name: '이전 달', exact: true }).click()
-  await page.getByRole('button', { name: '2026-09-30, 암송 기록 있음', exact: true }).click()
-  await expect(page.locator('.activityDetail')).toContainText('로마서 8장 1–10절')
-  await page.getByRole('link', { name: '기록 보기·수정' }).click()
-  await expect(page).toHaveURL(/\/records\?date=2026-09-30&view=month/)
-  await expect(page.locator('.selectedDateLabel')).toHaveText('선택한 날짜: 2026-09-30')
-  await expect(page.locator('.historyNav strong')).toHaveText('2026년 9월')
-  await page.locator('.calendarDay.selected').click()
+  await page.getByRole('button', { name: '2026-09-30, 암송 기록 수정', exact: true }).click()
   await expect(page.locator('.editorModal input[type=date]')).toHaveValue('2026-09-30')
 })
 
@@ -123,15 +117,18 @@ test('record creation and deletion update the calendar and achievement condition
   })
   await page.goto('/')
   await expect(page.locator('.activitySummary')).toContainText('현재 2일 연속')
-  await page.getByRole('link', { name: '이 날짜에 기록하기' }).click()
+  await page.getByRole('link', { name: '2026년 10월 기록 달력 전체 보기' }).click()
   await page.locator('.calendarDay.selected').click()
   await page.locator('.editorModal select').selectOption('romans-8')
   await page.getByRole('button', { name: '기록 저장', exact: true }).click()
   await expect(page.getByRole('dialog')).toHaveCount(0)
+  await expect(page.locator('.achievementToast')).toContainText('3일 이어가기')
+  await page.getByRole('button', { name: '달성 알림 닫기' }).click()
   await page.getByRole('link', { name: '암송 도우미 홈으로 이동' }).click()
   await expect(page.locator('.activitySummary')).toHaveText('이번 달 3일 기록 · 현재 3일 연속')
   await expect(page.locator('.scriptCard .completionTrophy')).toHaveText('🏆 전체 기록 완료')
-  await page.getByRole('link', { name: '나의 성취 보기 →' }).click()
+  await page.getByRole('button', { name: '메뉴 열기' }).click()
+  await page.getByRole('link', { name: /^나의 성취/ }).click()
   await expect(page.locator('[data-achievement="three-day-streak"] .badgeStatus')).toHaveText(
     '달성',
   )
@@ -143,10 +140,12 @@ test('record creation and deletion update the calendar and achievement condition
   await page.getByRole('button', { name: '삭제', exact: true }).click()
   await page.getByRole('button', { name: '삭제', exact: true }).click()
   await expect(page.getByRole('dialog')).toHaveCount(0)
+  await expect(page.locator('.achievementToast')).toHaveCount(0)
   await page.getByRole('link', { name: '암송 도우미 홈으로 이동' }).click()
   await expect(page.locator('.activitySummary')).toHaveText('이번 달 2일 기록 · 현재 2일 연속')
   await expect(page.locator('.scriptCard .completionTrophy')).toHaveCount(0)
-  await page.getByRole('link', { name: '나의 성취 보기 →' }).click()
+  await page.getByRole('button', { name: '메뉴 열기' }).click()
+  await page.getByRole('link', { name: /^나의 성취/ }).click()
   await expect(page.locator('[data-achievement="three-day-streak"] .badgeStatus')).toHaveText(
     '진행 중',
   )
@@ -238,9 +237,10 @@ test('calendar and streaks refresh across midnight without reloading', async ({
   await expect(page.locator('.activitySummary')).toContainText('현재 1일 연속')
   await page.clock.runFor(30_100)
   await expect(page.locator('.activitySummary')).toContainText('현재 0일 연속')
-  await expect(
-    page.getByRole('button', { name: '2026-10-12, 기록 없음, 오늘', exact: true }),
-  ).toBeEnabled()
+  await expect(page.locator('.activityDay.today')).toHaveAttribute(
+    'aria-label',
+    '2026-10-12, 기록 없음',
+  )
 })
 
 test('date calculations handle leap years, missing days, duplicates and future records', async ({
@@ -337,7 +337,8 @@ test('trophies and 100 percent require every verse and remain visible after relo
   await page.reload()
   await expect(card.locator('.progressText strong')).toHaveText('100%')
   await expect(card.locator('.completionTrophy')).toHaveText('🏆 전체 기록 완료')
-  await page.getByRole('link', { name: '나의 성취 보기 →' }).click()
+  await page.getByRole('button', { name: '메뉴 열기' }).click()
+  await page.getByRole('link', { name: /^나의 성취/ }).click()
   await expect(page.locator('.scriptProgressList .completionTrophy')).toHaveCount(1)
   await page.reload()
   await expect(page.locator('.scriptProgressList .completionTrophy')).toHaveCount(1)
