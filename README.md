@@ -50,6 +50,7 @@ Kakao Developers와 Supabase에 등록하는 콜백 주소는 서로 다릅니�
 
 - [카카오 로그인과 Supabase 설정](docs/kakao-supabase-auth.md)
 - [기능과 데이터 기준](docs/features.md)
+- [다음 기능 기획: 어드민·읽기·시험·성취·메인 달력](docs/planning/README.md)
 - [암송 기록 테이블과 보안 정책](docs/supabase-memorization-records.md)
 - [커밋 규칙](docs/commit-convention.md)
 - [Git 브랜치 전략](docs/git-branch-strategy.md)
