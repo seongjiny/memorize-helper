@@ -1,14 +1,20 @@
 # Memorize Helper
 
-성경 본문이나 긴 문장을 암송할 때 사용할 수 있는 작은 Vue 앱입니다. 본문을 단락과 줄 단위로 보여주고, 각 줄을 누르면 첫 단어를 제외한 나머지 단어를 가리거나 다시 표시할 수 있습니다.
+성경 본문을 가려 암송하고 날짜별 암송 범위를 기록하는 Vue 앱입니다. 로그인 없이 본문을 읽고 연습할 수 있으며, 카카오 로그인 후 개인 기록을 저장할 수 있습니다.
 
 ## 주요 기능
 
-- 암송 자료 목록 보기
-- 암송 자료 상세 화면에서 단락별 본문 보기
-- 줄 단위로 단어 가리기/보이기 전환
-- 글자 크기 단계 조절
-- 선택한 글자 크기 `localStorage` 저장
+- 자료 목록과 저장된 장절 범위 기준 진행률
+- 단락·장별 본문, 줄별 및 전체 가리기/열기
+- 글자 크기 8단계, 다크 모드, 소제목 가리기
+- 최근 기록의 마지막 절로 자동 이동
+- 카카오 로그인·로그아웃과 로그인 시작 화면으로 복귀
+- 날짜별 암송 기록 추가·수정·삭제, 주간·월간 조회
+- 업데이트 안내와 버전별 다시 보지 않기
+
+줄을 가리면 첫 번째 공백 구분 토큰만 남습니다. 현재 본문은 절 번호로 시작하므로 번호를 제외한 본문이 가려집니다. 개인 설정은 브라우저 `localStorage`에 저장합니다.
+
+현재는 사용자당 하루 한 기록을 저장합니다. 기존 기록은 수정으로 처리하며, 같은 날짜에 새 기록을 추가하면 충돌 안내를 표시합니다. 다른 자료 화면에서 기존 기록을 수정해도 원래 자료가 유지됩니다. 자료 변경은 암송 기록 화면에서 합니다.
 
 ## 기술 스택
 
@@ -42,6 +48,8 @@ Kakao Developers와 Supabase에 등록하는 콜백 주소는 서로 다릅니�
 ## 문서
 
 - [카카오 로그인과 Supabase 설정](docs/kakao-supabase-auth.md)
+- [기능과 데이터 기준](docs/features.md)
+- [암송 기록 테이블과 보안 정책](docs/supabase-memorization-records.md)
 - [커밋 규칙](docs/commit-convention.md)
 - [Git 브랜치 전략](docs/git-branch-strategy.md)
 
@@ -77,6 +85,15 @@ npm run format
 
 `src/` 아래 파일을 Prettier로 정리합니다.
 
+## 회귀 테스트
+
+```sh
+npx playwright install chromium
+npm test
+```
+
+테스트는 별도 로컬 서버와 가짜 인증·API 응답을 사용합니다. 실제 카카오 계정과 운영 DB는 사용하지 않습니다. 이미 설치된 Chromium을 사용하려면 `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH`에 실행 경로를 지정합니다.
+
 ## 프로젝트 구조
 
 ```text
@@ -86,12 +103,14 @@ src/
   router/index.ts          라우트 정의
   views/HomeView.vue       암송 자료 목록 화면
   views/ScriptView.vue     암송 본문 화면
+  views/RecordsView.vue    주간·월간 기록 및 편집
   data/database.ts         암송 자료 인덱스
-  composables/useFontScale.ts
+  composables/             세션·기록·본문 제어·개인 설정
   types/script.ts          암송 자료 타입
 
 public/scripts/            암송 자료 JSON 파일
 docs/                      프로젝트 문서
+tests/                     브라우저 동작 및 본문 데이터 회귀 테스트
 ```
 
 ## 암송 자료 추가하기
@@ -109,11 +128,8 @@ JSON 파일 형식:
   "blocks": [
     {
       "id": 1,
-      "label": "Section title",
-      "lines": [
-        "First line to memorize.",
-        "Second line to memorize."
-      ]
+      "label": "Section title (Matthew 5:1–2)",
+      "lines": ["1. First verse to memorize.", "2. Second verse to memorize."]
     }
   ]
 }
@@ -135,10 +151,10 @@ JSON 파일 형식:
 
 ## 현재 포함된 자료
 
-- Sermon on the Mount
-- Sermon on the Mount ESV
-- Romans 8
+- 산상수훈: 마태복음 5–7장, 개역개정, 111절
+- The Sermon on the Mount: Matthew 5–7, ESV, 111절
+- 로마서 8장: 개역개정, 39절
 
 ## 참고
 
-현재 본문 데이터와 일부 UI 문구에 인코딩이 깨진 문자열이 포함되어 있습니다. README는 현재 앱 구조와 개발 방법을 정리하는 데 초점을 맞췄고, 본문 데이터 정리는 별도 작업으로 다루는 것이 좋습니다.
+각 본문 줄은 번호가 붙은 한 절로 구성하고, 소제목은 `label`에 둡니다. 현재 장절 추출은 `Matthew`, `마`, `롬`과 줄 앞의 `숫자.`를 인식합니다. 다른 성경책이나 일반 문장을 추가할 때는 암송 기록·진행률 지원 범위를 별도로 확장해야 합니다. 판본과의 문장 전체 대조 검수는 별도 과정입니다.

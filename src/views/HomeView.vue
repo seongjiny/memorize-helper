@@ -1,6 +1,10 @@
 <!-- src\views\HomeView.vue -->
 <template>
   <section class="mx-auto max-w-[520px] px-[14px] py-3" :style="{ '--scale': String(fontPx / 15) }">
+    <p v-if="hasScriptError" role="alert">
+      일부 본문을 불러오지 못했습니다.
+      <button type="button" @click="loadScriptDetails">다시 시도</button>
+    </p>
     <ul class="grid gap-3">
       <li
         v-for="s in scripts"
@@ -55,33 +59,39 @@ import { compareVerseReferences, getVerseReference } from '@/lib/verseReference'
 
 const { fontPx } = useFontScale()
 const { user, initialize: initializeAuth } = useAuthSession()
-const { records, load } = useMemorizationRecords()
+const { records, load, isLoading, errorMessage } = useMemorizationRecords()
 
 const scripts = listScripts()
 const scriptDetails = ref<Record<string, MemorizationScript>>({})
+const hasScriptError = ref(false)
 
 initializeAuth()
 
 watch(
-  user,
-  (currentUser) => {
-    if (currentUser) void load(currentUser.id)
+  () => user.value?.id,
+  (userId) => {
+    if (userId) void load(userId)
   },
   { immediate: true },
 )
 
-onMounted(async () => {
-  const loadedScripts = await Promise.all(
+const loadScriptDetails = async () => {
+  const loadedScripts = await Promise.allSettled(
     scripts.map(async (item) => {
       const response = await fetch(item.source)
+      if (!response.ok) throw new Error('본문을 불러오지 못했습니다.')
       return [item.id, (await response.json()) as MemorizationScript] as const
     }),
   )
-  scriptDetails.value = Object.fromEntries(loadedScripts)
-})
+  hasScriptError.value = loadedScripts.some((result) => result.status === 'rejected')
+  scriptDetails.value = Object.fromEntries(
+    loadedScripts.flatMap((result) => (result.status === 'fulfilled' ? [result.value] : [])),
+  )
+}
+onMounted(loadScriptDetails)
 
 const progressByScript = computed(() => {
-  if (!user.value) return {}
+  if (!user.value || isLoading.value || errorMessage.value) return {}
 
   return Object.fromEntries(
     scripts.map((item) => {
@@ -96,7 +106,7 @@ const progressByScript = computed(() => {
       const coveredVerses = new Set<string>()
 
       records.value
-        .filter((record) => record.scriptId === item.id)
+        .filter((record) => record.userId === user.value?.id && record.scriptId === item.id)
         .forEach((record) => {
           verses.forEach((verse) => {
             const startsAtOrBefore =

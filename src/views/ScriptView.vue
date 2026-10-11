@@ -1,7 +1,11 @@
 <!-- src/views/ScriptView.vue -->
 <template>
+  <section v-if="!script" class="mx-auto max-w-[520px] px-[14px] py-5" aria-live="polite">
+    <p>{{ scriptError || '본문을 불러오고 있습니다.' }}</p>
+    <button v-if="scriptError" type="button" @click="loadScript">다시 시도</button>
+  </section>
   <section
-    v-if="script"
+    v-else
     class="mx-auto max-w-[520px] px-[14px] pt-3"
     :style="{
       '--font-px': `${fontPx}px`,
@@ -85,7 +89,7 @@
                 <p class="recordDesc">
                   {{
                     existingRecord
-                      ? '오늘 저장한 암송 범위를 수정할 수 있어요.'
+                      ? `${getIndexById(existingRecord.scriptId)?.title || existingRecord.book}의 오늘 기록을 수정합니다.`
                       : '열어본 절을 기준으로 범위를 입력했어요. 필요한 경우 수정해 주세요.'
                   }}
                 </p>
@@ -94,6 +98,12 @@
                 ×
               </button>
             </div>
+
+            <p v-if="existingRecord" class="recordDesc">
+              하루에 하나의 기록을 저장합니다. 암송 자료 변경은 암송 기록 화면에서 할 수 있어요.
+            </p>
+            <p v-if="isCheckingRecord" class="recordDesc">기존 기록을 확인하고 있습니다.</p>
+            <button v-if="recordLookupFailed" type="button" @click="openRecord">다시 시도</button>
 
             <label class="field">
               <span>날짜</span>
@@ -155,7 +165,11 @@
               <button class="secondaryBtn" type="button" :disabled="isSaving" @click="closeRecord">
                 취소
               </button>
-              <button class="primaryBtn" type="submit" :disabled="isSaving">
+              <button
+                class="primaryBtn"
+                type="submit"
+                :disabled="isSaving || isCheckingRecord || recordLookupFailed"
+              >
                 {{ isSaving ? '저장 중…' : existingRecord ? '수정 저장' : '기록 저장' }}
               </button>
             </div>
@@ -166,7 +180,7 @@
   </section>
 </template>
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, reactive, watch, watchEffect, ref } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, reactive, watch, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { getIndexById } from '@/data/database'
 import type { MemorizationScript } from '@/types/script'
@@ -185,7 +199,7 @@ import KakaoLoginPanel from '@/components/KakaoLoginPanel.vue'
 ========================= */
 const { fontPx } = useFontScale()
 const { user, initialize: initializeAuth } = useAuthSession()
-const { records, findByDate, load, save } = useMemorizationRecords()
+const { records, findByDate, load, save, update } = useMemorizationRecords()
 const { hideSubtitles, resumeFromLast } = usePersonalSettings()
 
 /* =========================
@@ -197,8 +211,12 @@ const todayKey = toDateKey(new Date())
 
 const scriptId = computed(() => String(route.params.id || ''))
 const script = ref<MemorizationScript | null>(null)
+const scriptError = ref('')
 const isRecordOpen = ref(false)
 const isSaving = ref(false)
+const isCheckingRecord = ref(false)
+const recordLookupFailed = ref(false)
+let recordLookup = 0
 const existingRecord = ref<MemorizationRecord | null>(null)
 const recordError = ref('')
 const recordForm = reactive({
@@ -208,16 +226,6 @@ const recordForm = reactive({
   startVerse: null as number | null,
   endChapter: null as number | null,
   endVerse: null as number | null,
-})
-
-watchEffect(async () => {
-  const idx = getIndexById(scriptId.value)
-  if (!idx) {
-    script.value = null
-    return
-  }
-  const res = await fetch(idx.source)
-  script.value = await res.json()
 })
 
 /* =========================
@@ -277,6 +285,58 @@ onUnmounted(unregister)
    - avoid calling split twice in template
 ========================= */
 const wordsCache = reactive<Record<string, string[]>>({})
+let lastAutoScrollKey = ''
+
+let scriptRequest = 0
+const loadScript = async () => {
+  const request = ++scriptRequest
+  const idx = getIndexById(scriptId.value)
+  script.value = null
+  scriptError.value = ''
+  if (!idx) {
+    scriptError.value = '암송 자료를 찾지 못했습니다.'
+    return
+  }
+  try {
+    const response = await fetch(idx.source)
+    if (!response.ok) throw new Error('본문을 불러오지 못했습니다.')
+    const detail = (await response.json()) as MemorizationScript
+    if (request === scriptRequest) script.value = detail
+  } catch {
+    if (request === scriptRequest) scriptError.value = '본문을 불러오지 못했습니다.'
+  }
+}
+
+watch(
+  scriptId,
+  () => {
+    for (const key of Object.keys(wordsCache)) delete wordsCache[key]
+    for (const key of Object.keys(revealed)) delete revealed[key]
+    for (const key of Object.keys(openedVerses)) delete openedVerses[key]
+    recordLookup += 1
+    lastAutoScrollKey = ''
+    isRecordOpen.value = false
+    existingRecord.value = null
+    void loadScript()
+  },
+  { immediate: true },
+)
+
+watch(
+  () => user.value?.id,
+  () => {
+    recordLookup += 1
+    lastAutoScrollKey = ''
+    isRecordOpen.value = false
+    existingRecord.value = null
+  },
+  { flush: 'sync' },
+)
+
+onUnmounted(() => {
+  scriptRequest += 1
+  recordLookup += 1
+})
 
 // key: `${bi}-${li}`
 const getWords = (bi: number, li: number, line: string) => {
@@ -294,15 +354,20 @@ const getLineReferenceKey = (blockLabel: string | undefined, line: string) => {
   return reference ? `${reference.chapter}:${reference.verse}` : undefined
 }
 
-let lastAutoScrollKey = ''
-
 watch(
   [script, user, resumeFromLast],
-  async ([currentScript, currentUser, shouldResume]) => {
+  async ([currentScript, currentUser, shouldResume], _previous, onCleanup) => {
+    let cancelled = false
+    onCleanup(() => {
+      cancelled = true
+    })
     if (!currentScript || !currentUser || !shouldResume) return
 
     await load(currentUser.id)
-    const latestRecord = records.value.find((record) => record.scriptId === currentScript.id)
+    if (cancelled) return
+    const latestRecord = records.value.find(
+      (record) => record.userId === currentUser.id && record.scriptId === currentScript.id,
+    )
     if (!latestRecord) return
 
     const scrollKey = `${currentScript.id}:${latestRecord.id || latestRecord.recordDate}`
@@ -310,6 +375,7 @@ watch(
     lastAutoScrollKey = scrollKey
 
     await nextTick()
+    if (cancelled) return
     document
       .querySelector(`[data-reference="${latestRecord.endChapter}:${latestRecord.endVerse}"]`)
       ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
@@ -350,8 +416,14 @@ const openedRangeLabel = computed(() => {
 
 const openRecord = async () => {
   await initializeAuth()
+  if (!script.value || isSaving.value) return
+  const request = ++recordLookup
+  const userId = user.value?.id
   existingRecord.value = null
   recordError.value = ''
+  recordLookupFailed.value = false
+  isCheckingRecord.value = Boolean(userId)
+  isRecordOpen.value = true
 
   const first = openedRange.value[0]
   const last = openedRange.value[openedRange.value.length - 1]
@@ -368,8 +440,11 @@ const openRecord = async () => {
   recordForm.endChapter = last?.chapter ?? null
   recordForm.endVerse = last?.verse ?? null
 
-  if (user.value) {
-    existingRecord.value = (await findByDate(user.value.id, todayKey)) ?? null
+  if (!userId) return
+  try {
+    const record = await findByDate(userId, todayKey)
+    if (request !== recordLookup || user.value?.id !== userId) return
+    existingRecord.value = record ?? null
     if (existingRecord.value) {
       recordForm.book = existingRecord.value.book
       recordForm.startChapter = existingRecord.value.startChapter
@@ -377,11 +452,18 @@ const openRecord = async () => {
       recordForm.endChapter = existingRecord.value.endChapter
       recordForm.endVerse = existingRecord.value.endVerse
     }
+  } catch {
+    if (request !== recordLookup) return
+    recordLookupFailed.value = true
+    recordError.value = '기존 암송 기록을 확인하지 못했습니다. 다시 시도해 주세요.'
+  } finally {
+    if (request === recordLookup) isCheckingRecord.value = false
   }
-  isRecordOpen.value = true
 }
 
 const closeRecord = () => {
+  if (isSaving.value) return
+  recordLookup += 1
   isRecordOpen.value = false
   existingRecord.value = null
 }
@@ -390,10 +472,12 @@ const isPositiveInteger = (value: number | null) =>
   typeof value === 'number' && Number.isInteger(value) && value > 0
 
 const submitRecord = async () => {
+  if (isSaving.value || isCheckingRecord.value || recordLookupFailed.value) return
   recordError.value = ''
 
   if (
     !recordForm.recordDate ||
+    recordForm.recordDate > todayKey ||
     !recordForm.book ||
     !isPositiveInteger(recordForm.startChapter) ||
     !isPositiveInteger(recordForm.startVerse) ||
@@ -416,11 +500,19 @@ const submitRecord = async () => {
 
   if (!user.value) return
 
+  const userId = user.value.id
+  const request = recordLookup
   isSaving.value = true
 
   try {
     await saveRecord()
+    if (request === recordLookup && user.value?.id === userId) {
+      isRecordOpen.value = false
+      existingRecord.value = null
+      await router.push('/records')
+    }
   } catch (error) {
+    if (request !== recordLookup) return
     recordError.value =
       error instanceof Error ? error.message : '기존 암송 기록을 확인하지 못했습니다.'
   } finally {
@@ -440,22 +532,22 @@ const saveRecord = async () => {
     return
   }
 
-  await save({
+  const original = existingRecord.value
+  const record = {
+    ...(original || {}),
     userId: user.value.id,
     recordDate: recordForm.recordDate,
-    scriptId: script.value.id,
+    scriptId: original?.scriptId || script.value.id,
     book: recordForm.book,
     startChapter: recordForm.startChapter,
     startVerse: recordForm.startVerse,
     endChapter: recordForm.endChapter,
     endVerse: recordForm.endVerse,
     updatedAt: new Date().toISOString(),
-  })
-
-  closeRecord()
-  router.push('/records')
+  }
+  if (original) await update(record)
+  else await save(record)
 }
-
 </script>
 
 <style scoped>
