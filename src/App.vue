@@ -65,6 +65,11 @@
                 <span>›</span>
               </RouterLink>
 
+              <RouterLink class="recordsLink" to="/achievements" @click="isMenuOpen = false">
+                나의 성취
+                <span>›</span>
+              </RouterLink>
+
               <RouterLink class="recordsLink" to="/updates" @click="isMenuOpen = false">
                 업데이트 노트
                 <span>›</span>
@@ -95,6 +100,9 @@
                 </label>
               </div>
             </template>
+            <div class="menuSection menuLabel appVersion" aria-label="앱 버전 정보">
+              <span>v{{ appVersion }}</span>
+            </div>
           </div>
         </Transition>
       </div>
@@ -109,33 +117,48 @@
     />
 
     <Transition name="updateModal">
-      <div v-if="isUpdateOpen" class="updateBackdrop">
-        <section class="updateModal" role="dialog" aria-modal="true" aria-label="업데이트 노트">
-          <UpdateNotesContent />
+      <div v-if="popupNote" class="updateBackdrop">
+        <section
+          ref="updateDialog"
+          class="updateModal"
+          role="dialog"
+          aria-modal="true"
+          aria-label="업데이트 노트"
+          @keydown="onUpdateKeydown"
+        >
+          <UpdateNotesContent :note="popupNote" />
 
           <label class="hideUpdate">
             <input v-model="dontShowUpdateAgain" type="checkbox" />
             <span>이 업데이트 다시 보지 않기</span>
           </label>
 
-          <button class="updateCloseBtn" type="button" @click="closeUpdate">확인했어요</button>
+          <button ref="updateCloseButton" class="updateCloseBtn" type="button" @click="closeUpdate">
+            확인했어요
+          </button>
         </section>
       </div>
     </Transition>
 
     <RouterView />
+    <AchievementToast />
   </main>
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useFontScale } from '@/composables/useFontScale'
 import { useScriptRevealControls } from '@/composables/useScriptRevealControls'
 import { usePersonalSettings } from '@/composables/usePersonalSettings'
-import { UPDATE_NOTE_STORAGE_KEY } from '@/data/updateNotes'
+import { useUpdateNotes } from '@/composables/useUpdateNotes'
+import { updateNoteStorageKey } from '@/lib/updateNote'
+import type { UpdateNote } from '@/types/updateNote'
 import KakaoLoginPanel from '@/components/KakaoLoginPanel.vue'
 import UpdateNotesContent from '@/components/UpdateNotesContent.vue'
+import AchievementToast from '@/components/AchievementToast.vue'
+
+const appVersion = __APP_VERSION__
 
 const { fontPx, scale, incFont, decFont } = useFontScale()
 const { controls: revealControls } = useScriptRevealControls()
@@ -145,8 +168,28 @@ const router = useRouter()
 const route = useRoute()
 const isMenuOpen = ref(false)
 const menuDepth = ref<'main' | 'settings'>('main')
-const isUpdateOpen = ref(localStorage.getItem(UPDATE_NOTE_STORAGE_KEY) !== '1')
+const { latestNote, load: loadUpdateNotes } = useUpdateNotes()
+const popupNote = ref<UpdateNote | null>(null)
+const updateCloseButton = ref<HTMLButtonElement | null>(null)
+const updateDialog = ref<HTMLElement | null>(null)
+let previousFocus: HTMLElement | null = null
+let seenUpdateId = ''
 const dontShowUpdateAgain = ref(false)
+
+onMounted(() => {
+  void loadUpdateNotes()
+})
+watch(latestNote, async (note) => {
+  if (!note || note.id === seenUpdateId) return
+  seenUpdateId = note.id
+  if (route.path === '/updates' || localStorage.getItem(updateNoteStorageKey(note.id)) === '1')
+    return
+  previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null
+  dontShowUpdateAgain.value = false
+  popupNote.value = note
+  await nextTick()
+  updateCloseButton.value?.focus()
+})
 
 const showBack = computed(() => route.path !== '/')
 
@@ -184,10 +227,29 @@ const openRecord = () => {
 }
 
 const closeUpdate = () => {
-  if (dontShowUpdateAgain.value) {
-    localStorage.setItem(UPDATE_NOTE_STORAGE_KEY, '1')
+  if (dontShowUpdateAgain.value && popupNote.value) {
+    localStorage.setItem(updateNoteStorageKey(popupNote.value.id), '1')
   }
-  isUpdateOpen.value = false
+  popupNote.value = null
+  void nextTick(() => previousFocus?.focus())
+}
+
+const onUpdateKeydown = (event: KeyboardEvent) => {
+  if (event.key === 'Escape') {
+    event.preventDefault()
+    closeUpdate()
+  }
+  if (event.key !== 'Tab') return
+  const controls = updateDialog.value?.querySelectorAll<HTMLElement>('input, button')
+  const first = controls?.[0]
+  const last = controls?.[controls.length - 1]
+  if (event.shiftKey && document.activeElement === first) {
+    event.preventDefault()
+    last?.focus()
+  } else if (!event.shiftKey && document.activeElement === last) {
+    event.preventDefault()
+    first?.focus()
+  }
 }
 
 watch(
@@ -290,6 +352,12 @@ watch(
   color: rgba(0, 0, 0, 0.62);
   font-size: 13px;
   font-weight: 700;
+}
+
+.appVersion {
+  margin: 0;
+  border-bottom: 0;
+  font-size: 12px;
 }
 
 .fontCtl {

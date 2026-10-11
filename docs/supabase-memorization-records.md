@@ -60,7 +60,9 @@ using ((select auth.uid()) = user_id);
 ```
 
 `unique (user_id, record_date)` 때문에 한 사용자는 하루에 하나의 기록만 가집니다. 같은 날짜에
-다시 저장할 때 이 키를 기준으로 `upsert`하면 기존 기록이 새 범위로 변경됩니다.
+새 기록을 추가하면 unique 제약으로 거절됩니다. 기존 기록은 ID와 사용자 ID를 기준으로
+수정합니다. 다른 자료 화면에서 기존 기록을 열어도 원래 `script_id`를 유지하며, 자료 변경은
+기록 관리 화면에서 사용자가 명시적으로 선택합니다.
 
 ## 2. 생성 결과 확인
 
@@ -87,24 +89,29 @@ using ((select auth.uid()) = user_id);
 
 ## 3. 프런트 연결 방식
 
-저장은 다음 형태의 `upsert`를 사용합니다.
+새 기록은 `insert`, 기존 기록은 `update`를 사용합니다. 날짜 충돌 시 기존 기록을 덮어쓰지 않습니다.
 
 ```ts
-await supabase.from('memorization_records').upsert(record, {
-  onConflict: 'user_id,record_date',
-})
+await supabase.from('memorization_records').insert(record)
+await supabase.from('memorization_records').update(record).eq('id', recordId).eq('user_id', userId)
 ```
 
-주간 기록은 로그인 사용자의 선택된 날짜 범위만 조회합니다.
+사용자의 전체 기록을 날짜 내림차순으로 500개씩 페이지 조회합니다. 주간·월간 화면과 전체
+진행률은 이 기록을 사용합니다. 한 번의 기본 응답 제한으로 오래된 기록이 누락되지 않도록
+빈 페이지 또는 500개 미만의 페이지가 나올 때까지 이어서 불러옵니다.
 
 ```ts
 await supabase
   .from('memorization_records')
   .select('*')
-  .gte('record_date', weekStart)
-  .lte('record_date', weekEnd)
-  .order('record_date')
+  .eq('user_id', userId)
+  .order('record_date', { ascending: false })
+  .range(offset, offset + 499)
 ```
 
-RLS 정책이 `auth.uid()`와 `user_id`를 비교하므로 브라우저에서는 로그인한 사용자의 기록만
-조회하고 변경할 수 있습니다.
+Supabase의 API 최대 응답 행 수는 500개 이상으로 설정해야 합니다. 이 문서의 SQL은 API 행
+제한 설정을 변경하지 않습니다.
+
+계정 변경 시 프런트 기록 상태를 초기화하고 이전 요청의 응답을 무시합니다. 실제 데이터
+접근 제어는 RLS 정책이 담당하며 `auth.uid()`와 `user_id`를 비교합니다. 위 SQL이 실제 프로젝트에
+적용됐는지는 별도 사용자로 확인해야 합니다. 이번 변경에는 테이블 구조 변경이 없습니다.

@@ -7,6 +7,8 @@
       </div>
     </div>
 
+    <p v-if="selectedDate && user" class="selectedDateLabel">선택한 날짜: {{ selectedDate }}</p>
+
     <template v-if="!isReady">
       <div class="stateBox">로그인 정보를 확인하고 있습니다.</div>
     </template>
@@ -65,7 +67,7 @@
               v-for="day in weekDays"
               :key="day.key"
               class="dayRow"
-              :class="{ today: day.isToday }"
+              :class="{ today: day.isToday, selected: day.key === selectedDate }"
             >
               <div class="date">
                 <span>{{ day.weekday }}</span>
@@ -123,9 +125,22 @@
                 today: day?.isToday,
                 hasRecord: day?.record,
                 canCreate: day && !day.record && !day.isFuture,
+                selected: day?.key === selectedDate,
               }"
+              :aria-label="
+                day
+                  ? `${day.key}, ${day.record ? '암송 기록 수정' : day.isFuture ? '미래 날짜' : '암송 기록 추가'}`
+                  : undefined
+              "
+              :aria-current="day?.isToday ? 'date' : undefined"
               :disabled="!day || day.isFuture"
-              :title="day?.record ? formatRange(day.record) : day && !day.isFuture ? '암송 기록 추가' : undefined"
+              :title="
+                day?.record
+                  ? formatRange(day.record)
+                  : day && !day.isFuture
+                    ? '암송 기록 추가'
+                    : undefined
+              "
               @click="day && (day.record ? openEditor(day.record) : openCreator(day.key))"
             >
               <template v-if="day">
@@ -250,15 +265,19 @@
 
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import type { MemorizationRecord } from '@/types/memorizationRecord'
 import { useAuthSession } from '@/composables/useAuthSession'
 import { useMemorizationRecords } from '@/composables/useMemorizationRecords'
-import { addDays, startOfWeek, toDateKey } from '@/lib/date'
+import { addDays, getMonthCells, parseDateKey, startOfWeek, toDateKey } from '@/lib/date'
+import { useToday } from '@/composables/useToday'
 import { listScripts } from '@/data/database'
 import KakaoLoginPanel from '@/components/KakaoLoginPanel.vue'
 
 const weekdays = ['일', '월', '화', '수', '목', '금', '토']
-const todayKey = toDateKey(new Date())
+const { today, todayKey } = useToday()
+const route = useRoute()
+const selectedDate = ref('')
 const viewMode = ref<'week' | 'month'>('week')
 const selectedWeek = ref(startOfWeek(new Date()))
 const selectedMonth = ref(new Date(new Date().getFullYear(), new Date().getMonth(), 1))
@@ -267,6 +286,7 @@ const isEditorOpen = ref(false)
 const isDeleteConfirm = ref(false)
 const isMutating = ref(false)
 const editError = ref('')
+let editorSession = 0
 const editForm = reactive({
   recordDate: '',
   scriptId: '',
@@ -292,9 +312,35 @@ const scripts = listScripts()
 initialize()
 
 watch(
-  user,
-  (currentUser) => {
-    if (currentUser) void load(currentUser.id)
+  [() => route.query.date, () => route.query.view, todayKey],
+  ([dateKey, view]) => {
+    selectedDate.value = ''
+    if (view === 'month' || view === 'week') viewMode.value = view
+    const date = typeof dateKey === 'string' ? parseDateKey(dateKey) : null
+    if (!date || String(dateKey) > todayKey.value) return
+    selectedDate.value = String(dateKey)
+    selectedWeek.value = startOfWeek(date)
+    selectedMonth.value = new Date(date.getFullYear(), date.getMonth(), 1)
+  },
+  { immediate: true },
+)
+
+watch(
+  () => user.value?.id,
+  () => {
+    editorSession += 1
+    isEditorOpen.value = false
+    selectedRecord.value = null
+    isDeleteConfirm.value = false
+    editError.value = ''
+  },
+  { flush: 'sync' },
+)
+
+watch(
+  () => user.value?.id,
+  (userId) => {
+    if (userId) void load(userId)
   },
   { immediate: true },
 )
@@ -315,8 +361,8 @@ const weekDays = computed(() =>
       key,
       weekday: weekdays[index],
       day: date.getDate(),
-      isToday: key === todayKey,
-      isFuture: key > todayKey,
+      isToday: key === todayKey.value,
+      isFuture: key > todayKey.value,
       record: recordsByDate.value.get(key),
     }
   }),
@@ -335,7 +381,7 @@ const weekTitle = computed(() => {
 })
 
 const isCurrentWeek = computed(
-  () => toDateKey(selectedWeek.value) === toDateKey(startOfWeek(new Date())),
+  () => toDateKey(selectedWeek.value) === toDateKey(startOfWeek(today.value)),
 )
 
 const moveWeek = (days: number) => {
@@ -343,45 +389,30 @@ const moveWeek = (days: number) => {
 }
 
 const goToday = () => {
-  selectedWeek.value = startOfWeek(new Date())
+  selectedWeek.value = startOfWeek(today.value)
 }
 
 const monthTitle = computed(
   () => `${selectedMonth.value.getFullYear()}년 ${selectedMonth.value.getMonth() + 1}월`,
 )
 
-const monthCells = computed(() => {
-  const year = selectedMonth.value.getFullYear()
-  const month = selectedMonth.value.getMonth()
-  const firstWeekday = new Date(year, month, 1).getDay()
-  const lastDay = new Date(year, month + 1, 0).getDate()
-  const cells: Array<{
-    key: string
-    day: number
-    isToday: boolean
-    isFuture: boolean
-    record?: MemorizationRecord
-  } | null> = Array.from({ length: firstWeekday }, () => null)
-
-  for (let day = 1; day <= lastDay; day += 1) {
-    const key = toDateKey(new Date(year, month, day))
-    cells.push({
-      key,
-      day,
-      isToday: key === todayKey,
-      isFuture: key > todayKey,
-      record: recordsByDate.value.get(key),
-    })
-  }
-
-  return cells
-})
+const monthCells = computed(() =>
+  getMonthCells(selectedMonth.value).map((day) =>
+    day
+      ? {
+          ...day,
+          isToday: day.key === todayKey.value,
+          isFuture: day.key > todayKey.value,
+          record: recordsByDate.value.get(day.key),
+        }
+      : null,
+  ),
+)
 
 const isCurrentMonth = computed(() => {
-  const today = new Date()
   return (
-    selectedMonth.value.getFullYear() === today.getFullYear() &&
-    selectedMonth.value.getMonth() === today.getMonth()
+    selectedMonth.value.getFullYear() === today.value.getFullYear() &&
+    selectedMonth.value.getMonth() === today.value.getMonth()
   )
 })
 
@@ -394,8 +425,7 @@ const moveMonth = (months: number) => {
 }
 
 const goThisMonth = () => {
-  const today = new Date()
-  selectedMonth.value = new Date(today.getFullYear(), today.getMonth(), 1)
+  selectedMonth.value = new Date(today.value.getFullYear(), today.value.getMonth(), 1)
 }
 
 const openEditor = (record: MemorizationRecord) => {
@@ -425,7 +455,7 @@ const applySelectedScriptDefaults = () => {
 }
 
 const openCreator = (recordDate: string) => {
-  if (recordDate > todayKey) return
+  if (recordDate > todayKey.value) return
   selectedRecord.value = null
   isEditorOpen.value = true
   isDeleteConfirm.value = false
@@ -447,12 +477,14 @@ const hasValidRange = () =>
   editForm.scriptId &&
   editForm.book &&
   editForm.recordDate &&
-  editForm.recordDate <= todayKey &&
+  editForm.recordDate <= todayKey.value &&
   [editForm.startChapter, editForm.startVerse, editForm.endChapter, editForm.endVerse].every(
     (value) => Number.isInteger(value) && value > 0,
   )
 
 const saveChanges = async () => {
+  if (!user.value || isMutating.value) return
+  const session = editorSession
   const currentRecord = selectedRecord.value
   editError.value = ''
 
@@ -495,8 +527,8 @@ const saveChanges = async () => {
     }
     if (currentRecord) await updateRecord(record)
     else await saveRecord(record)
-    closeEditor()
   } catch (error) {
+    if (session !== editorSession) return
     editError.value =
       error instanceof Error
         ? error.message
@@ -505,11 +537,13 @@ const saveChanges = async () => {
           : '암송 기록을 저장하지 못했습니다.'
   } finally {
     isMutating.value = false
-    if (!editError.value) closeEditor()
+    if (session === editorSession && !editError.value) closeEditor()
   }
 }
 
 const deleteRecord = async () => {
+  if (!user.value || isMutating.value) return
+  const session = editorSession
   const currentRecord = selectedRecord.value
   if (!currentRecord) return
   editError.value = ''
@@ -518,10 +552,11 @@ const deleteRecord = async () => {
   try {
     await removeRecord(currentRecord)
   } catch (error) {
+    if (session !== editorSession) return
     editError.value = error instanceof Error ? error.message : '암송 기록을 삭제하지 못했습니다.'
   } finally {
     isMutating.value = false
-    if (!editError.value) closeEditor()
+    if (session === editorSession && !editError.value) closeEditor()
   }
 }
 
@@ -535,6 +570,17 @@ const formatRange = (record: MemorizationRecord) => {
 </script>
 
 <style scoped>
+.selectedDateLabel {
+  margin-bottom: 12px;
+  color: var(--practice-muted);
+  font-size: 13px;
+}
+
+.dayRow.selected,
+.calendarDay.selected {
+  box-shadow: inset 0 0 0 2px var(--practice-accent);
+}
+
 .recordsView {
   padding: 20px 14px 36px;
 }

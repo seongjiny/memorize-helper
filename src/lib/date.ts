@@ -17,3 +17,21 @@ export const addDays = (date: Date, days: number) => {
   next.setDate(next.getDate() + days)
   return next
 }
+
+export const parseDateKey = (key: string) => {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(key)) return null
+  const date = new Date(`${key}T12:00:00`)
+  return Number.isFinite(date.getTime()) && toDateKey(date) === key ? date : null
+}
+
+export const getMonthCells = (month: Date) => {
+  const year = month.getFullYear()
+  const index = month.getMonth()
+  const firstWeekday = new Date(year, index, 1).getDay()
+  const days = new Date(year, index + 1, 0).getDate()
+  const count = Math.ceil((firstWeekday + days) / 7) * 7
+  return Array.from({ length: count }, (_, cell) => {
+    const day = cell - firstWeekday + 1
+    return day > 0 && day <= days ? { key: toDateKey(new Date(year, index, day)), day } : null
+  })
+}
