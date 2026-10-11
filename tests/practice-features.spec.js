@@ -85,6 +85,8 @@ test('home calendar is a compact monthly preview linking to records', async ({ p
   await page.goto('/')
   await expect(page.locator('.activitySummary')).toHaveText('이번 달 5일 기록 · 현재 3일 연속')
   await expect(page.locator('.activityDay.recorded')).toHaveCount(5)
+  await expect(page.locator('.activityDay.recorded .activityRecordDot')).toHaveCount(5)
+  await expect(page.locator('.activityDay:not(.recorded) .activityRecordDot')).toHaveCount(0)
   await expect(page.locator('.activityDay')).toHaveCount(31)
   await expect(page.locator('.activityCalendar button')).toHaveCount(0)
   await expect(page.locator('.activityDetail')).toHaveCount(0)

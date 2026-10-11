@@ -31,8 +31,10 @@
             }"
             :aria-label="`${day.key}, ${recordDates.has(day.key) ? '암송 기록 있음' : '기록 없음'}`"
             :aria-current="day.key === todayKey ? 'date' : undefined"
-            >{{ day.day }}</span
           >
+            <span>{{ day.day }}</span>
+            <span v-if="recordDates.has(day.key)" class="activityRecordDot" aria-hidden="true" />
+          </span>
           <span v-else aria-hidden="true" />
         </template>
       </div>
@@ -109,9 +111,19 @@ const cells = computed(() => getMonthCells(month.value))
 }
 .activityDay {
   display: grid;
-  place-items: center;
+  grid-template-rows: 14px 4px;
+  align-content: center;
+  justify-items: center;
+  row-gap: 1px;
+  line-height: 14px;
   height: 23px;
   border-radius: 5px;
+}
+.activityRecordDot {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--practice-accent);
 }
 .activityDay.recorded {
   background: var(--practice-accent-soft);
