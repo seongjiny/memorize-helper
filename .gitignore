@@ -41,3 +41,6 @@ __screenshots__/
 # Playwright
 playwright-report/
 test-results/
+
+# Supabase CLI local state
+supabase/.temp/

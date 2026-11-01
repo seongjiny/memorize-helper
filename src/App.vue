@@ -1,6 +1,10 @@
 <!-- src/App.vue -->
 <template>
-  <main class="app" :class="{ dark: isDarkMode }" :style="{ '--scale': scale }">
+  <main
+    class="app"
+    :class="{ dark: isDarkMode, adminLayout: route.path.startsWith('/admin') }"
+    :style="{ '--scale': scale }"
+  >
     <header class="topbar">
       <button v-if="showBack" class="navBtn" type="button" aria-label="뒤로 가기" @click="goBack">
         ←
@@ -72,6 +76,16 @@
 
               <RouterLink class="recordsLink" to="/updates" @click="isMenuOpen = false">
                 업데이트 노트
+                <span>›</span>
+              </RouterLink>
+
+              <RouterLink
+                v-if="adminStatus === 'allowed'"
+                class="recordsLink"
+                to="/admin"
+                @click="isMenuOpen = false"
+              >
+                운영 모니터링
                 <span>›</span>
               </RouterLink>
 
@@ -157,8 +171,12 @@ import type { UpdateNote } from '@/types/updateNote'
 import KakaoLoginPanel from '@/components/KakaoLoginPanel.vue'
 import UpdateNotesContent from '@/components/UpdateNotesContent.vue'
 import AchievementToast from '@/components/AchievementToast.vue'
+import { useAdminAccess } from '@/composables/useAdminAccess'
+import { useVisitTracking } from '@/composables/useVisitTracking'
 
 const appVersion = __APP_VERSION__
+const { status: adminStatus } = useAdminAccess()
+useVisitTracking()
 
 const { fontPx, scale, incFont, decFont } = useFontScale()
 const { controls: revealControls } = useScriptRevealControls()
@@ -266,6 +284,9 @@ watch(
   max-width: 520px;
   margin: 0 auto;
   padding: 0 14px;
+}
+.app.adminLayout {
+  max-width: 1080px;
 }
 
 .topbar {

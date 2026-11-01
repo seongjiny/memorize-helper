@@ -15,6 +15,7 @@ export default defineConfig({
     env: {
       VITE_SUPABASE_URL: 'https://review.example.test',
       VITE_SUPABASE_ANON_KEY: 'review-public-key',
+      VITE_MONITORING_ENV: 'dev',
     },
   },
 })

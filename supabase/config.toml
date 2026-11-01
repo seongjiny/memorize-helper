@@ -1,0 +1,5 @@
+[functions.monitoring-admin]
+verify_jwt = true
+
+[functions.track-visit]
+verify_jwt = false
