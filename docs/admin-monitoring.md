@@ -38,6 +38,7 @@ v0.3.0부터 기존 앱의 `/admin`에서 조회 전용 운영 화면을 제공�
 
 `supabase/migrations/20261101002111_admin_monitoring.sql`에 스키마와 집계 함수를 보관합니다.
 파일 버전은 연결된 프로젝트에 적용된 마이그레이션 이력과 일치합니다.
+후속 `*_remember_admin_visitors.sql`은 익명 방문 이력이 없는 관리자 브라우저도 제외 상태로 보관합니다.
 
 - `monitoring_private.admins`, `visits`, `page_views`: 비공개 스키마, RLS 활성화,
   일반 역할의 접근·쓰기 권한 없음. RLS 정책 없음 안내는 의도된 기본 차단입니다.

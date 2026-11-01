@@ -4,6 +4,7 @@ do $$
 declare
   actor uuid := (select user_id from monitoring_private.admins order by created_at limit 1);
   visitor uuid := gen_random_uuid();
+  fresh_admin_visitor uuid := gen_random_uuid();
   event uuid := gen_random_uuid();
   result jsonb;
   n integer;
@@ -38,6 +39,10 @@ begin
   select count(*) into n from monitoring_private.page_views;
   perform public.monitoring_track_view(null, 'dev', visitor, gen_random_uuid(), 'home');
   assert n = (select count(*) from monitoring_private.page_views), 'Same admin browser stays excluded after logout';
+  perform public.monitoring_track_view(actor, 'dev', fresh_admin_visitor, gen_random_uuid(), null);
+  assert exists (select 1 from monitoring_private.visits where visitor_id=fresh_admin_visitor and excluded), 'First authenticated admin request remembers the browser without creating a page view';
+  perform public.monitoring_track_view(null, 'dev', fresh_admin_visitor, gen_random_uuid(), 'home');
+  assert n = (select count(*) from monitoring_private.page_views), 'An initially authenticated admin stays excluded after logout';
   result := public.monitoring_read_admin(actor, 'dashboard', 'dev', 30);
   assert jsonb_array_length(result->'daily') = 30;
   assert result->>'timezone' = 'Asia/Seoul';
