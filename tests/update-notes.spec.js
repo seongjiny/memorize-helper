@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test'
+import { test, expect } from './fixtures.js'
 import { updatesApi } from './support.js'
 
 const note = (id = 'db-current-release', overrides = {}) => ({
@@ -33,7 +33,7 @@ test('updates history preserves previous releases and hides newer app versions',
   await page.route(updatesApi, (route) =>
     route.fulfill({
       json: [
-        note('future-app-release', { app_version: '0.3.0', title: '아직 사용할 수 없는 기능' }),
+        note('future-app-release', { app_version: '99.0.0', title: '아직 사용할 수 없는 기능' }),
         note(),
         note('2026-08-11-memorization-experience', {
           app_version: '0.1.0',
